@@ -60,9 +60,11 @@ typings/
 
 # build output
 dist/
+.goblinworld/
 
 # editor files
 .idea
 .vscode
+.claude/
 .DS_Store
 **/*.DS_Store

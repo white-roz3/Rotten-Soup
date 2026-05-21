@@ -1,12 +1,14 @@
 {
-  "name": "rotten-soup",
+  "name": "goblinworld",
   "version": "0.4.2",
   "private": false,
+  "packageManager": "npm@10.8.2",
   "scripts": {
-    "start": "node server",
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "heroku-postbuild": "yarn run build"
+    "start": "node server.js",
+    "serve": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build",
+    "test": "node tests/goblinworld-live.test.js",
+    "heroku-postbuild": "npm run build"
   },
   "dependencies": {
     "vue": "^2.5.17",
@@ -35,8 +37,8 @@
     "webpack-xlsx-loader": "^1.0.0"
   },
   "engines": {
-    "node": "^8.9.1",
-    "npm": "5.5.1",
+    "node": ">=20",
+    "npm": ">=10",
     "yarn": "^1.9.4"
   }
 }

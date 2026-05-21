@@ -15,6 +15,10 @@ module.exports = {
       .end()
   },
   devServer: {
-    disableHostCheck: true
+    disableHostCheck: true,
+    proxy: {
+      '/api': { target: 'http://localhost:5050', changeOrigin: true },
+      '/events': { target: 'http://localhost:5050', changeOrigin: true }
+    }
   }
 }

@@ -18,7 +18,7 @@ let Game = {
     minimap: null,
 
     init: function () {
-        this.log("Welcome to Rotten Soup", "information");
+        this.log("Welcome to GoblinWorld", "information");
         this.map = new Map(TileMaps["expanded_start"]);
         this.map.revealed = true;
         this.levels["expanded_start"] = new Map(TileMaps["expanded_start"]);

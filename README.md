@@ -1,45 +1,61 @@
-# Rotten Soup
-###### A roguelike written in JavaScript with [Vue](https://vuejs.org/), [Vuetify](https://vuetifyjs.com/en/), [Tiled](https://www.mapeditor.org/), [rot.js](http://ondras.github.io/rot.js/hp/) and [PixiJS](http://www.pixijs.com/).
+# GoblinWorld
+###### A live 2D goblin habitat where Claude Haiku has a body, a map, and a public terminal.
 
-![screenshot](public/images/screen.gif)
+![GoblinWorld hero](public/images/goblinworld/hero.png)
 
-While maintaining some roots in traditional roguelike gameplay with features like randomly generated dungeons, turn-based combat and permadeath, Rotten Soup also has many modern features such as tiled graphics, animations, a statically defined overworld, and mouse controls. Since Rotten Soup is developed using JavaScript, you can play it in your browser [here](https://rottensoup.herokuapp.com)!
+GoblinWorld rebrands the original browser roguelike into a shared spectator world. A single server-owned goblin is controlled by a Claude Haiku decision loop, rendered in the existing Vue/PixiJS tile world, and accompanied by a real-time terminal where visitors can watch public rationale, actions, speech, and memory updates.
 
 ## Features
-* [x] Three detailed areas that you can explore. The Mulberry Town, Forest & Graveyard
-* [x] Randomly generated dungeons with different themes every 5 floors with unique enemies and loot
-* [x] A tough mini-boss that can raise the dead
-* [x] Dozens of unique villagers!
-* [x] Melee, Magic, and Ranged combat
-* [x] Wide variety of playable characters
-* [x] Potions, swords, keys, and spellbooks!
-* [x] Quests
-* [x] Dialog and interaction with NPC's
-* [x] Procedurally generated worlds not unlike Minecraft
-* [x] Weapon enchantments
-* [x] Goal-based enemies
+* [x] Landing page with a custom GPT Image 2 pixel-art GoblinWorld scene
+* [x] Shared `/live` spectator view with a PixiJS map and live terminal
+* [x] Server-owned goblin state exposed through `/api/live/state`
+* [x] Server-Sent Events stream at `/api/live/events`
+* [x] Strict action schema for public Claude Haiku decisions
+* [x] Append-only event log and snapshot persistence under `.goblinworld/`
+* [x] Legacy roguelike content, maps, NPCs, dungeons, items, and visualizer routes retained
 
-## Stuff I'm working on
-* [ ] Shops where you can sell/buy items
-* [ ] Unique characters classes, skills, and abilities
-* [ ] More weapons (Axes, Polearms, Bows, Staves, Morningstar, Whips, Daggers, Clubs, Spears)
-* [ ] Enemies that used ranged and magical attacks
+## Live AI Loop
+The backend asks Claude Haiku for one structured decision at a time. The model receives a compact world snapshot and must choose a legal action such as `move`, `wait`, or `inspect`. GoblinWorld shows only public rationale and in-character goblin speech; hidden chain-of-thought is never displayed.
 
+When `ANTHROPIC_API_KEY` is not set, the server uses a deterministic fallback loop so the shared world and UI still run locally.
 
-## Running the game locally
-To run Rotten Soup locally, you can clone this repository and install its dependencies with `yarn`. You will probably need to install `vue-cli`.
+## Running Locally
 
-```
-npm install vue-cli -g
+Install dependencies:
+
+```bash
+npm install
 ```
 
-Once you do that, you can run the app with `yarn serve`. 
+Run the Vue development server:
 
-## Contact / Feedback
+```bash
+npm run serve
+```
 
-If you have any feedback, please send me an email at larkenx@gmail.com or drop an issue on GitHub. Any feedback is welcome and greatly appreciated.
+Build and run the full GoblinWorld backend:
 
-## Donate
-If you've really enjoyed my game and want to buy me a cup of coffee, I won't stop you!
+```bash
+npm run build
+npm start
+```
 
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/larkenx)
+The production server serves the app plus:
+
+* `/api/live/state`
+* `/api/live/events`
+* `/v1`, `/v2`, `/v3` legacy builds
+
+Optional environment:
+
+```bash
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL=claude-haiku-4-5
+GOBLINWORLD_MODEL_PROVIDER=anthropic
+GOBLINWORLD_TURN_INTERVAL_MS=3000
+```
+
+For Railway, set `ANTHROPIC_API_KEY` as a service variable. Do not expose it as a `VUE_APP_*` variable because those are bundled into the browser app.
+
+## Project Stack
+GoblinWorld uses Vue 2, Vuetify, PixiJS, rot-js, Tiled JSON maps, Express, and a provider-aware backend controller using the Anthropic Messages API.

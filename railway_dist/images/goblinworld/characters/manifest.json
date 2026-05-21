@@ -1,0 +1,115 @@
+{
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "directions": ["down", "left", "right", "up"],
+  "characters": {
+    "chatty": {
+      "spriteKey": "chatty",
+      "name": "Chatty, the chosen one",
+      "sheet": "images/goblinworld/characters/chatty.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "bartender": {
+      "spriteKey": "bartender",
+      "name": "Bartender",
+      "sheet": "images/goblinworld/characters/bartender.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "mayor": {
+      "spriteKey": "mayor",
+      "name": "Mayor",
+      "sheet": "images/goblinworld/characters/mayor.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "dwarf": {
+      "spriteKey": "dwarf",
+      "name": "Dwarf",
+      "sheet": "images/goblinworld/characters/dwarf.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "marketTrader": {
+      "spriteKey": "marketTrader",
+      "name": "Market trader",
+      "sheet": "images/goblinworld/characters/marketTrader.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "hoodedVillager": {
+      "spriteKey": "hoodedVillager",
+      "name": "Hooded villager",
+      "sheet": "images/goblinworld/characters/hoodedVillager.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "forestWanderer": {
+      "spriteKey": "forestWanderer",
+      "name": "Forest wanderer",
+      "sheet": "images/goblinworld/characters/forestWanderer.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "lanternKeeper": {
+      "spriteKey": "lanternKeeper",
+      "name": "Lantern keeper",
+      "sheet": "images/goblinworld/characters/lanternKeeper.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    },
+    "stoneGuard": {
+      "spriteKey": "stoneGuard",
+      "name": "Stone guard",
+      "sheet": "images/goblinworld/characters/stoneGuard.png",
+      "frameWidth": 32,
+      "frameHeight": 32,
+      "directions": ["down", "left", "right", "up"],
+      "animations": {
+        "idle": { "frames": [0], "speed": 0 },
+        "walk": { "frames": [0, 1, 2, 3], "speed": 0.12 }
+      }
+    }
+  }
+}

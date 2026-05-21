@@ -94,7 +94,7 @@ export default {
 		loadGame(id) {
 			this.playerSelected = true
 			Game.init(id, { width: this.width, height: this.height })
-			Game.log('Welcome to Rotten Soup!', 'information')
+			Game.log('Welcome to GoblinWorld!', 'information')
 			Game.log('Press ? to view the controls.', 'player_move')
 		},
 		navigate(didNavigate) {

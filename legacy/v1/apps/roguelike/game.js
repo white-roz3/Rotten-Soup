@@ -1,4 +1,4 @@
-/* A game created to mimic some elements Dungeon Crawl Stone Soup in Rot.JS */
+/* A legacy roguelike prototype built in Rot.JS */
 
 /* Create game object to hold the display and initialize game */
 var Game = {

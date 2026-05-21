@@ -3,32 +3,20 @@
 		<v-content>
 			<router-view></router-view>
 		</v-content>
-		<v-footer app v-if="showFooter">
-			<span class="pl-2">RottenSoup</span>
+		<v-footer app v-if="showFooter && footerEnabled">
+			<span class="pl-2">GoblinWorld</span>
 			<v-spacer />
 			<v-tooltip top>
 				<v-btn slot="activator" active-class="" @click.native="backToGame()" icon ripple>
 					<v-icon>fa-gamepad</v-icon>
 				</v-btn>
-				<span>Play the game!</span>
+				<span>Watch the live goblin</span>
 			</v-tooltip>
 			<v-tooltip top>
 				<v-btn slot="activator" active-class="" to="/voronoi" icon ripple>
 					<v-icon>map</v-icon>
 				</v-btn>
 				<span>Map Generator</span>
-			</v-tooltip>
-			<v-tooltip top>
-				<v-btn slot="activator" target="_blank" href="https://github.com/Larkenx/Rotten-Soup" icon ripple>
-					<v-icon>fab fa-github</v-icon>
-				</v-btn>
-				<span>The source code</span>
-			</v-tooltip>
-			<v-tooltip top>
-				<v-btn slot="activator" target="_blank" href="https://twitter.com/stevenlarken" icon ripple>
-					<v-icon>fab fa-twitter</v-icon>
-				</v-btn>
-				<span>Tweet tweet!</span>
 			</v-tooltip>
 		</v-footer>
 	</v-app>
@@ -70,11 +58,16 @@ export default {
 			showFooter
 		}
 	},
+	computed: {
+		footerEnabled() {
+			return !this.$route.meta || this.$route.meta.footer !== false
+		}
+	},
 	components: {},
 	created() {},
 	methods: {
 		backToGame() {
-			window.location.replace(window.location.origin)
+			this.$router.push('/live')
 		}
 	}
 }

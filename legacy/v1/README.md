@@ -1,4 +1,4 @@
-# Rotten Soup Roguelike
+# GoblinWorld Legacy Roguelike
 
 A roguelike written in JavaScript with [rot.js](http://ondras.github.io/rot.js/hp/).
 Currently in early development and I have created my own representation of a

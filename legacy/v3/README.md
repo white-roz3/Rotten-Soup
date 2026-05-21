@@ -1,8 +1,8 @@
-# Rotten Soup
+# GoblinWorld Legacy v3
 ![screenshot](assets/images/screenshot.png)
 
-Rotten Soup is roguelike written in JavaScript with [rot.js](http://ondras.github.io/rot.js/hp/). My goal was to create a really robust
-data representation for all game entities using ES6 classes. I used [Vue.js](https://vuejs.org/) and [Vuetify](https://vuetifyjs.com/) to build a reactive UI, which made displaying game information very easy. In the [v.0.1-alpha release](https://github.com/Larkenx/Rotten-Soup/releases/tag/v.0.1-alpha) of Rotten Soup, I used bare-bones JQuery and W3CSS to update game information to the UI, but it was clunky and in desperate need of something more robust.
+GoblinWorld legacy v3 is a roguelike written in JavaScript with [rot.js](http://ondras.github.io/rot.js/hp/). My goal was to create a really robust
+data representation for all game entities using ES6 classes. I used [Vue.js](https://vuejs.org/) and [Vuetify](https://vuetifyjs.com/) to build a reactive UI, which made displaying game information very easy.
 
 # Controls
 - Movement is 8-directional using either the numpad or vim keys. You may also use the arrow-keys for 4-directional movement.

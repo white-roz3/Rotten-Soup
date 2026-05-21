@@ -28,7 +28,7 @@
   <v-container fluid grid-list-xl>
     <v-layout row>
       <v-flex xs12>
-        <h2>Welcome to Rotten Soup</h2>
+        <h2>Welcome to GoblinWorld</h2>
       </v-flex>
     </v-layout>
     <v-layout row>

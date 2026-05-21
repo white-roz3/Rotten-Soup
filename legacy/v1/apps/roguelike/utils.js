@@ -244,7 +244,7 @@ class GameOverview {
 
     constructor() {
         /* We will organize the overall game 'display', where display
-         * is the entire HTML page in which Rotten Soup is played, in the following,
+         * is the entire HTML page in which GoblinWorld is played, in the following,
          * design:
          *
          *  -The game itself (ASCII graphics) will be in a left rectangle,
@@ -273,7 +273,7 @@ class GameOverview {
 
         $('body').prepend(this.boilerplate);
         $('#gameDisplay').html(gdc); // attach the game canvas
-        Game.console.log('Welcome to RottenSoup!', 'information');
+        Game.console.log('Welcome to GoblinWorld!', 'information');
         /* Testing */
         // for (var i = 0; i < 100; i++) Game.console.log(`<i>${i} bottles of beer</i>`, 'defend');
 
