@@ -835,7 +835,8 @@ export default {
 		cleanFeedSpeaker(speaker, event = {}) {
 			const raw = String(speaker || '').trim()
 			const systemSpeakers = ['Discovery', 'GoblinWorld', 'Narrator', 'Quest', 'Scene', 'Story', 'System']
-			if (!raw || systemSpeakers.includes(raw)) return this.feedSpeaker(event || {})
+			const isSystemSpeaker = systemSpeakers.some(systemSpeaker => systemSpeaker.toLowerCase() === raw.toLowerCase())
+			if (!raw || isSystemSpeaker) return this.feedSpeaker(event || {})
 			if (event && event.type === 'combat') {
 				const enemySpeakers = ['Cellar Rat', 'Bitey Weed', 'Ledger Mite', 'Bramble Crawler', 'Crown Hound', 'Thorn Scout', 'Pantry Slime', 'Armor Scrap', 'Ledger Warden', 'Crown Remnant']
 				if (enemySpeakers.includes(raw)) return 'Battle'
@@ -855,7 +856,7 @@ export default {
 				/next lead|route recovery|objective changed|controller|validation|raw prompt|api key|story clue|story is speaking|piece of the story|current story|story beat|stay put and listen|sky-thought|feet choose anyway|wanders|npc\s*\/\s*move/i.test(String(text || ''))
 		},
 		isSystemFeedEvent(event) {
-			return Boolean(event && ['discovery', 'phase', 'quest', 'scene'].includes(event.type))
+			return Boolean(event && ['discovery', 'phase', 'quest', 'scene', 'story', 'system'].includes(String(event.type || '').toLowerCase()))
 		},
 		feedMessageSpeaker(event) {
 			const match = String(event.message || '').match(/^([A-Z][A-Za-z ]{2,32}):\s+/)

@@ -297,6 +297,22 @@ function createEvent(input) {
 	return new GoblinWorldEvent(input)
 }
 
+function sanitizePersistedEvent(event) {
+	if (!event || typeof event !== 'object') return event
+	try {
+		return createEvent(event).toJSON()
+	} catch (error) {
+		return {
+			...event,
+			feed: null
+		}
+	}
+}
+
+function sanitizePersistedEvents(events) {
+	return Array.isArray(events) ? events.map(sanitizePersistedEvent) : []
+}
+
 function createDefaultMap() {
 	const width = 18
 	const height = 12
@@ -553,6 +569,7 @@ class GoblinWorld {
 			this.state.map.actors = normalizeActors(this.state.map.actors || [])
 		}
 		this.state.story = normalizeStoryState(this.state.story || {}, this.state.turn || 0)
+		this.state.events = sanitizePersistedEvents(this.state.events)
 		this.eventLimit = options.eventLimit || DEFAULT_EVENT_LIMIT
 		if (!Number.isInteger(this.state.nextEventId)) {
 			const highestEventId = (this.state.events || []).reduce((highest, event) => {
@@ -577,6 +594,7 @@ class GoblinWorld {
 			this.state.map.actors = normalizeActors(this.state.map.actors || [])
 		}
 		this.state.story = normalizeStoryState(this.state.story || {}, this.state.turn || 0)
+		this.state.events = sanitizePersistedEvents(this.state.events)
 		if (!Number.isInteger(this.state.nextEventId)) {
 			const highestEventId = (this.state.events || []).reduce((highest, event) => {
 				return Number.isInteger(event.id) ? Math.max(highest, event.id) : highest

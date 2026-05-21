@@ -71,8 +71,14 @@ const HIDDEN_SYSTEM_EVENT_TYPES = new Set([
 	'discovery',
 	'phase',
 	'quest',
-	'scene'
+	'scene',
+	'story',
+	'system'
 ])
+
+const SYSTEM_FEED_SPEAKERS_NORMALIZED = new Set(
+	Array.from(SYSTEM_FEED_SPEAKERS).map(speaker => speaker.toLowerCase())
+)
 
 function visibleSpeaker(actor, event = {}) {
 	if (actor === CHATTY_NAME) return 'Chatty'
@@ -88,10 +94,9 @@ function visibleSpeaker(actor, event = {}) {
 
 function cleanFeedSpeaker(speaker, event = {}) {
 	const raw = String(speaker || '').trim()
-	if (!raw || SYSTEM_FEED_SPEAKERS.has(raw)) return visibleSpeaker(event.actor, event)
+	if (!raw || SYSTEM_FEED_SPEAKERS_NORMALIZED.has(raw.toLowerCase())) return visibleSpeaker(event.actor, event)
 	if (event.type === 'combat' && ENEMY_SPEAKERS.has(raw)) return 'Battle'
 	if (raw === 'NPC') return 'Villager'
-	if (raw === 'GoblinWorld') return 'Narrator'
 	return raw
 }
 

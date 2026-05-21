@@ -1814,6 +1814,68 @@ test('feed narrator rejects curated feed objects with system event types or debu
 	assert.strictEqual(debugText.feed, null)
 })
 
+test('feed narrator rejects legacy uppercase system speakers on nonstandard event types', () => {
+	const banned = ['STORY', 'QUEST', 'DISCOVERY', 'GOBLINWORLD', 'Story', 'Quest', 'Discovery', 'GoblinWorld']
+	for (const speaker of banned) {
+		const event = createEvent({
+			id: 749,
+			turn: 12,
+			type: speaker.toLowerCase(),
+			actor: speaker,
+			message: `${speaker}: Day 45727: Roads After Dawn`,
+			feed: {
+				speaker,
+				text: 'Day 45727: Roads After Dawn',
+				tone: 'story',
+				visible: true
+			}
+		}).toJSON()
+
+		assert.strictEqual(event.feed, null, speaker)
+	}
+})
+
+test('persisted legacy feed entries are sanitized when the world is loaded', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		events: [
+			{
+				id: 900,
+				turn: 44,
+				type: 'story',
+				actor: 'Story',
+				action: 'begin',
+				message: 'Day 45727: Roads After Dawn',
+				feed: {
+					speaker: 'STORY',
+					text: 'Day 45727: Roads After Dawn',
+					tone: 'story',
+					visible: true
+				}
+			},
+			{
+				id: 901,
+				turn: 45,
+				type: 'dialogue',
+				actor: 'Market Trader',
+				action: 'speak',
+				message: 'Market Trader: Chatty, cloth costs less than fear today.',
+				feed: {
+					speaker: 'Market Trader',
+					text: 'Chatty, cloth costs less than fear today.',
+					tone: 'speech',
+					visible: true
+				}
+			}
+		],
+		nextEventId: 902
+	}))
+
+	const events = world.getSnapshot().events
+	assert.strictEqual(events[0].feed, null)
+	assert.strictEqual(events[1].feed.speaker, 'Market Trader')
+	assert.strictEqual(events[1].feed.text, 'Chatty, cloth costs less than fear today.')
+})
+
 test('feed narrator keeps quest tracker updates out of the adventure feed', () => {
 	const objective = createEvent({
 		id: 741,
