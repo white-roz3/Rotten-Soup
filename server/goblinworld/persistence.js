@@ -100,6 +100,25 @@ function createWorldPersistence(dir, options = {}) {
 			if (fs.existsSync(snapshotPath)) fs.unlinkSync(snapshotPath)
 			if (fs.existsSync(eventsPath)) fs.unlinkSync(eventsPath)
 		},
+		backupAndClear() {
+			ensureDir(root)
+			const stamp = new Date().toISOString().replace(/[^0-9A-Za-z]+/g, '-')
+			const backups = {
+				snapshot: null,
+				events: null
+			}
+			if (fs.existsSync(snapshotPath)) {
+				backups.snapshot = `snapshot.json.backup-${stamp}`
+				fs.copyFileSync(snapshotPath, path.join(root, backups.snapshot))
+				fs.unlinkSync(snapshotPath)
+			}
+			if (fs.existsSync(eventsPath)) {
+				backups.events = `events.jsonl.backup-${stamp}`
+				fs.copyFileSync(eventsPath, path.join(root, backups.events))
+				fs.unlinkSync(eventsPath)
+			}
+			return backups
+		},
 		paths: {
 			root,
 			snapshotPath,

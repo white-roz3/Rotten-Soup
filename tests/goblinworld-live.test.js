@@ -172,6 +172,30 @@ function waitForListening(server) {
 	})
 }
 
+function getBadFeedEvents(events = []) {
+	const banned = new Set(['story', 'quest', 'discovery', 'goblinworld', 'scene', 'narrator', 'battle'])
+	return events.filter(event => {
+		const speaker = event && event.feed && event.feed.speaker
+		return speaker && banned.has(String(speaker).toLowerCase())
+	})
+}
+
+async function readFirstSseData(url) {
+	const response = await fetch(url)
+	const reader = response.body.getReader()
+	const decoder = new TextDecoder()
+	let text = ''
+	for (let index = 0; index < 20 && !text.includes('data: '); index += 1) {
+		const chunk = await reader.read()
+		if (chunk.done) break
+		text += decoder.decode(chunk.value, { stream: true })
+	}
+	await reader.cancel()
+	const dataLine = text.split(/\r?\n/).find(line => line.startsWith('data: '))
+	assert.ok(dataLine, `Expected SSE data line in ${text}`)
+	return JSON.parse(dataLine.slice('data: '.length))
+}
+
 test('validates a structured goblin decision and strips hidden reasoning fields', () => {
 	const decision = validateGoblinDecision(
 		{
@@ -2650,8 +2674,81 @@ test('serves a shared live state snapshot without exposing server secrets', asyn
 		assert.ok(Array.isArray(snapshot.runtime.inventorySummary))
 		assert.ok(Array.isArray(snapshot.runtime.nearbyEnemies))
 		assert.ok(Array.isArray(snapshot.runtime.nearbyNpcs))
+		assert.ok(snapshot.build)
+		assert.ok(snapshot.build.gitSha)
+		assert.ok(snapshot.build.startedAt)
+		assert.strictEqual(snapshot.build.eventSanitizerVersion, 'strict-character-feed-v3')
+		assert.strictEqual(snapshot.build.runtime.mode, 'classic-autonomous')
 		assert.strictEqual(JSON.stringify(snapshot).includes('OPENAI_API_KEY'), false)
 		assert.strictEqual(JSON.stringify(snapshot).includes('ANTHROPIC_API_KEY'), false)
+	} finally {
+		await new Promise(resolve => server.close(resolve))
+	}
+})
+
+test('live state response sanitizes poisoned persisted feed speakers at the final boundary', async () => {
+	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 3 } }))
+	world.state.events.push({
+		id: 901,
+		turn: 7,
+		type: 'phase',
+		actor: 'GoblinWorld',
+		action: 'begin',
+		position: { x: 2, y: 3 },
+		message: 'Day 74709: Roads After Dawn',
+		feed: {
+			speaker: 'STORY',
+			text: 'Day 74709: Roads After Dawn',
+			tone: 'story',
+			visible: true
+		}
+	})
+	const app = createGoblinWorldApp({ world, startLoop: false, persistence: false, loop: { apiKey: '' } })
+	const server = app.listen(0)
+	await waitForListening(server)
+
+	try {
+		const { port } = server.address()
+		const response = await fetch(`http://127.0.0.1:${port}/api/live/state`)
+		const snapshot = await response.json()
+		const poisoned = snapshot.events.find(event => event.id === 901)
+
+		assert.strictEqual(response.status, 200)
+		assert.ok(poisoned)
+		assert.strictEqual(poisoned.feed, null)
+		assert.strictEqual(getBadFeedEvents(snapshot.events).length, 0)
+	} finally {
+		await new Promise(resolve => server.close(resolve))
+	}
+})
+
+test('SSE replay sanitizes poisoned legacy quest and world feed speakers', async () => {
+	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 3 } }))
+	world.state.events.push({
+		id: 902,
+		turn: 8,
+		type: 'quest',
+		actor: 'GoblinWorld',
+		action: 'complete',
+		position: { x: 2, y: 3 },
+		message: 'Next lead: Market. Break the route loop toward Market.',
+		feed: {
+			speaker: 'Quest',
+			text: 'Next lead: Market. Break the route loop toward Market.',
+			tone: 'story',
+			visible: true
+		}
+	})
+	const app = createGoblinWorldApp({ world, startLoop: false, persistence: false, loop: { apiKey: '' } })
+	const server = app.listen(0)
+	await waitForListening(server)
+
+	try {
+		const { port } = server.address()
+		const event = await readFirstSseData(`http://127.0.0.1:${port}/api/live/events`)
+
+		assert.strictEqual(event.id, 902)
+		assert.strictEqual(event.feed, null)
 	} finally {
 		await new Promise(resolve => server.close(resolve))
 	}
@@ -2678,6 +2775,12 @@ test('serves a safe live health status without secrets or memory', async () => {
 		assert.strictEqual(health.controller.mode, 'fallback')
 		assert.ok(health.controller.plan)
 		assert.ok(Number.isFinite(health.uptimeSeconds))
+		assert.ok(health.build)
+		assert.ok(health.build.gitSha)
+		assert.ok(health.build.startedAt)
+		assert.strictEqual(health.build.eventSanitizerVersion, 'strict-character-feed-v3')
+		assert.strictEqual(health.runtime.mode, 'classic-autonomous')
+		assert.strictEqual(health.events.badFeedCount, 0)
 		assert.strictEqual(serialized.includes('ANTHROPIC_API_KEY'), false)
 		assert.strictEqual(serialized.includes('OPENAI_API_KEY'), false)
 		assert.strictEqual(serialized.includes('sk-'), false)
@@ -2723,6 +2826,61 @@ test('admin reset is token guarded and replaces the shared live world', async ()
 		assert.strictEqual(state.turn, 0)
 		assert.strictEqual(fs.existsSync(persistence.paths.snapshotPath), false)
 		assert.strictEqual(JSON.stringify(reset).includes('reset-secret'), false)
+	} finally {
+		await new Promise(resolve => server.close(resolve))
+	}
+})
+
+test('admin backup-reset backs up poisoned persistence and returns a clean snapshot', async () => {
+	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 4, y: 4 }, turn: 37 }))
+	world.state.events.push({
+		id: 903,
+		turn: 37,
+		type: 'phase',
+		actor: 'GoblinWorld',
+		message: 'Day 75039: Roads After Dawn',
+		feed: {
+			speaker: 'Story',
+			text: 'Day 75039: Roads After Dawn',
+			tone: 'story',
+			visible: true
+		}
+	})
+	const persistence = createWorldPersistence(fs.mkdtempSync(path.join(os.tmpdir(), 'goblinworld-backup-reset-')))
+	persistence.saveSnapshot(world.getSnapshot())
+	persistence.appendEvent(world.state.events[world.state.events.length - 1])
+	const app = createGoblinWorldApp({
+		world,
+		startLoop: false,
+		persistence,
+		adminToken: 'backup-secret',
+		loop: { apiKey: '' }
+	})
+	const server = app.listen(0)
+	await waitForListening(server)
+
+	try {
+		const { port } = server.address()
+		const missing = await fetch(`http://127.0.0.1:${port}/api/live/admin/backup-reset`, { method: 'POST' })
+		const good = await fetch(`http://127.0.0.1:${port}/api/live/admin/backup-reset`, {
+			method: 'POST',
+			headers: { Authorization: 'Bearer backup-secret' }
+		})
+		const reset = await good.json()
+		const state = await (await fetch(`http://127.0.0.1:${port}/api/live/state`)).json()
+
+		assert.strictEqual(missing.status, 403)
+		assert.strictEqual(good.status, 200)
+		assert.strictEqual(reset.ok, true)
+		assert.strictEqual(reset.snapshotTurn, 0)
+		assert.strictEqual(reset.badFeedCount, 0)
+		assert.ok(reset.backups.snapshot.startsWith('snapshot.json.backup-'))
+		assert.ok(reset.backups.events.startsWith('events.jsonl.backup-'))
+		assert.strictEqual(fs.existsSync(path.join(persistence.paths.root, reset.backups.snapshot)), true)
+		assert.strictEqual(fs.existsSync(path.join(persistence.paths.root, reset.backups.events)), true)
+		assert.strictEqual(state.turn, 0)
+		assert.strictEqual(getBadFeedEvents(state.events).length, 0)
+		assert.strictEqual(JSON.stringify(reset).includes('backup-secret'), false)
 	} finally {
 		await new Promise(resolve => server.close(resolve))
 	}

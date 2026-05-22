@@ -1,10 +1,53 @@
 const express = require('express')
+const childProcess = require('child_process')
 const path = require('path')
 const { createInitialWorld, createWorldFromTiledMap, GoblinWorld, createEvent } = require('./liveWorld')
 const { getClassicRuntimeSnapshot } = require('./classicRuntime')
 const { getRegisteredMap, loadRegisteredTiledMap } = require('./mapRegistry')
 const { getControllerStatus, startGoblinLoop } = require('./openaiGoblin')
 const { createWorldPersistence } = require('./persistence')
+
+const EVENT_SANITIZER_VERSION = 'strict-character-feed-v3'
+const BUILD_STARTED_AT = new Date().toISOString()
+let cachedGitSha = null
+const BANNED_FEED_SPEAKERS = new Set([
+	'story',
+	'quest',
+	'discovery',
+	'goblinworld',
+	'scene',
+	'narrator',
+	'battle'
+])
+
+function getGitSha(staticRoot) {
+	if (cachedGitSha) return cachedGitSha
+	const envSha = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || process.env.SOURCE_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || ''
+	if (envSha) {
+		cachedGitSha = envSha
+		return cachedGitSha
+	}
+	try {
+		cachedGitSha = childProcess.execFileSync('git', ['rev-parse', 'HEAD'], {
+			cwd: staticRoot,
+			stdio: ['ignore', 'pipe', 'ignore']
+		}).toString().trim()
+	} catch (error) {
+		cachedGitSha = 'unknown'
+	}
+	return cachedGitSha
+}
+
+function createBuildInfo(staticRoot, runtimeMode = 'classic-autonomous') {
+	return {
+		gitSha: getGitSha(staticRoot),
+		startedAt: BUILD_STARTED_AT,
+		eventSanitizerVersion: EVENT_SANITIZER_VERSION,
+		runtime: {
+			mode: runtimeMode
+		}
+	}
+}
 
 function createDefaultWorld(staticRoot) {
 	const persistence = createWorldPersistence(path.join(staticRoot, '.goblinworld'))
@@ -71,8 +114,52 @@ function enrichPersistedWorld(state, staticRoot) {
 	return state
 }
 
+function sanitizePublicEvent(event) {
+	try {
+		const sanitized = createEvent(event).toJSON()
+		const speaker = sanitized && sanitized.feed && sanitized.feed.speaker
+		if (speaker && BANNED_FEED_SPEAKERS.has(String(speaker).toLowerCase())) {
+			return {
+				...sanitized,
+				feed: null
+			}
+		}
+		return sanitized
+	} catch (error) {
+		return {
+			...event,
+			feed: null
+		}
+	}
+}
+
+function sanitizePublicEvents(events) {
+	return Array.isArray(events) ? events.map(sanitizePublicEvent) : []
+}
+
+function countBadFeedEvents(events) {
+	return sanitizePublicEvents(events).filter(event => {
+		const speaker = event && event.feed && event.feed.speaker
+		return speaker && BANNED_FEED_SPEAKERS.has(String(speaker).toLowerCase())
+	}).length
+}
+
+function sanitizePublicSnapshot(snapshot, staticRoot) {
+	const publicSnapshot = {
+		...snapshot,
+		events: sanitizePublicEvents(snapshot.events)
+	}
+	delete publicSnapshot.memory
+	const runtime = publicSnapshot.runtime || getClassicRuntimeSnapshot(publicSnapshot, { staticRoot })
+	return {
+		...publicSnapshot,
+		runtime,
+		build: createBuildInfo(staticRoot, runtime.mode)
+	}
+}
+
 function sendSse(res, event) {
-	const payload = typeof event.toSse === 'function' ? event.toSse() : createEvent(event).toSse()
+	const payload = createEvent(sanitizePublicEvent(typeof event.toJSON === 'function' ? event.toJSON() : event)).toSse()
 	res.write(payload)
 }
 
@@ -119,12 +206,11 @@ function createGoblinWorldApp(options = {}) {
 			...getPublicControllerStatus(loopOptions),
 			plan: snapshot.story && snapshot.story.directorPlan ? snapshot.story.directorPlan : null
 		}
-		delete snapshot.memory
+		const publicSnapshot = sanitizePublicSnapshot(snapshot, staticRoot)
 		res.json({
-			...snapshot,
+			...publicSnapshot,
 			model: controller.model,
-			controller,
-			runtime: snapshot.runtime || getClassicRuntimeSnapshot(snapshot, { staticRoot })
+			controller
 		})
 	})
 
@@ -136,10 +222,14 @@ function createGoblinWorldApp(options = {}) {
 		}
 		res.json({
 			ok: true,
+			build: createBuildInfo(staticRoot, snapshot.runtime && snapshot.runtime.mode),
 			status: snapshot.status,
 			turn: snapshot.turn,
 			uptimeSeconds: Math.max(0, Math.round((Date.now() - startedAt) / 1000)),
 			clients: clients.size,
+			runtime: {
+				mode: snapshot.runtime && snapshot.runtime.mode
+			},
 			controller,
 			persistence: {
 				enabled: Boolean(persistence)
@@ -152,7 +242,8 @@ function createGoblinWorldApp(options = {}) {
 					: null
 			},
 			events: {
-				buffered: Array.isArray(snapshot.events) ? snapshot.events.length : 0
+				buffered: Array.isArray(snapshot.events) ? snapshot.events.length : 0,
+				badFeedCount: countBadFeedEvents(snapshot.events)
 			}
 		})
 	})
@@ -170,10 +261,34 @@ function createGoblinWorldApp(options = {}) {
 		const freshWorld = createFreshWorld(staticRoot)
 		world.replaceState(freshWorld.state)
 		const snapshot = world.getSnapshot()
-		delete snapshot.memory
 		res.json({
 			ok: true,
-			snapshot
+			snapshot: sanitizePublicSnapshot(snapshot, staticRoot)
+		})
+	})
+
+	app.post('/api/live/admin/backup-reset', (req, res) => {
+		if (!adminToken) {
+			res.status(404).json({ ok: false })
+			return
+		}
+		if (!isAuthorizedAdmin(req, adminToken)) {
+			res.status(403).json({ ok: false })
+			return
+		}
+		const backups = persistence && typeof persistence.backupAndClear === 'function'
+			? persistence.backupAndClear()
+			: { snapshot: null, events: null }
+		const freshWorld = createFreshWorld(staticRoot)
+		world.replaceState(freshWorld.state)
+		const freshSnapshot = world.getSnapshot()
+		if (persistence) persistence.saveSnapshot(freshSnapshot)
+		const snapshot = sanitizePublicSnapshot(freshSnapshot, staticRoot)
+		res.json({
+			ok: true,
+			backups,
+			snapshotTurn: snapshot.turn,
+			badFeedCount: countBadFeedEvents(snapshot.events)
 		})
 	})
 
@@ -187,7 +302,7 @@ function createGoblinWorldApp(options = {}) {
 		res.write('retry: 2500\n\n')
 		clients.add(res)
 
-		world.getSnapshot().events.forEach(event => sendSse(res, event))
+		sanitizePublicEvents(world.getSnapshot().events).forEach(event => sendSse(res, event))
 
 		req.on('close', () => {
 			clients.delete(res)
