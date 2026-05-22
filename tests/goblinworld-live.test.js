@@ -1608,6 +1608,13 @@ test('Railway Docker image builds frontend from source instead of stale railway_
 	assert.match(dockerignore, /^railway_dist\/$/m)
 })
 
+test('Railway healthcheck uses the lightweight health endpoint', () => {
+	const railwayConfig = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'railway.json'), 'utf8'))
+
+	assert.strictEqual(railwayConfig.deploy.healthcheckPath, '/api/live/health')
+	assert.notStrictEqual(railwayConfig.deploy.healthcheckPath, '/api/live/state')
+})
+
 test('director plan tracks current intent and recovers when position repeats', () => {
 	const task = {
 		id: 'day-2-secure-market-road',
