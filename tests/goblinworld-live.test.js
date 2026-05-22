@@ -791,6 +791,45 @@ test('dialogue picker broadens story lines before repeating the same NPC line', 
 	assert.strictEqual(new Set(spoken).size, spoken.length)
 })
 
+test('dialogue picker still provides a Chatty follow-up when falling back to rotated dialogue banks', () => {
+	const actor = { name: 'NPC', storyKey: 'forestWanderer', spriteKey: 'forestWanderer', entityType: 'NPC' }
+	const turn = 500
+	const story = normalizeStoryState({
+		phaseId: 'phase-1',
+		scene: {
+			sceneId: 'phase-1.bridge.travel',
+			sceneType: 'travel',
+			phaseId: 'phase-1',
+			questId: 'phase-1-bridge-objective',
+			locationZone: 'lower-town',
+			title: 'Keep learning the body',
+			summary: 'Chatty is scouting.',
+			participants: ['chatty'],
+			beats: ['route'],
+			status: 'active',
+			startedTurn: 0,
+			updatedTurn: 0
+		},
+		dialogue: {
+			// Exhaust the scripted lines for this conversation id so the picker uses the rotated bank fallback.
+			spokenLines: [
+				'phase-1.bridge.travel::forestWanderer::line-0',
+				'phase-1.bridge.travel::forestWanderer::line-1',
+				'phase-1.bridge.travel::forestWanderer::line-2',
+				'phase-1.bridge.travel::forestWanderer::line-3',
+				'phase-1.bridge.travel::forestWanderer::line-4',
+				'phase-1.bridge.travel::forestWanderer::line-5'
+			]
+		}
+	}, turn)
+
+	const result = selectStoryNpcDialogueLine(actor, story, turn, { scene: story.scene })
+	assert.ok(result.line)
+	assert.ok(result.followUp)
+	assert.strictEqual(result.followUp.actor, 'Chatty, the chosen one')
+	assert.match(result.followUp.line, /^Chatty:\s+/)
+})
+
 test('maps live actors into named NPC story identities with combat roles', () => {
 	const guard = getNpcIdentityForActor({
 		name: 'NPC',
