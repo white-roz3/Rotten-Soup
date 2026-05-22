@@ -21,21 +21,28 @@ const BANNED_FEED_SPEAKERS = new Set([
 ])
 
 function getGitSha(staticRoot) {
-	if (cachedGitSha) return cachedGitSha
+	if (cachedGitSha && cachedGitSha.staticRoot === staticRoot) return cachedGitSha.value
 	const envSha = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT_SHA || process.env.SOURCE_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || ''
 	if (envSha) {
-		cachedGitSha = envSha
-		return cachedGitSha
+		cachedGitSha = { staticRoot, value: envSha }
+		return cachedGitSha.value
 	}
 	try {
-		cachedGitSha = childProcess.execFileSync('git', ['rev-parse', 'HEAD'], {
+		const buildCommit = require('fs').readFileSync(path.join(staticRoot, 'BUILD_COMMIT'), 'utf8').trim()
+		if (buildCommit) {
+			cachedGitSha = { staticRoot, value: buildCommit }
+			return cachedGitSha.value
+		}
+	} catch (error) {}
+	try {
+		cachedGitSha = { staticRoot, value: childProcess.execFileSync('git', ['rev-parse', 'HEAD'], {
 			cwd: staticRoot,
 			stdio: ['ignore', 'pipe', 'ignore']
-		}).toString().trim()
+		}).toString().trim() }
 	} catch (error) {
-		cachedGitSha = 'unknown'
+		cachedGitSha = { staticRoot, value: 'unknown' }
 	}
-	return cachedGitSha
+	return cachedGitSha.value
 }
 
 function createBuildInfo(staticRoot, runtimeMode = 'classic-autonomous') {

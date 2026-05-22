@@ -2799,6 +2799,26 @@ test('serves a safe live health status without secrets or memory', async () => {
 	}
 })
 
+test('live health build stamp can read a packaged BUILD_COMMIT file', async () => {
+	const staticRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'goblinworld-build-stamp-'))
+	fs.writeFileSync(path.join(staticRoot, 'BUILD_COMMIT'), 'abc1234packaged\n')
+	const world = new GoblinWorld(createInitialWorld({ turn: 1 }))
+	const app = createGoblinWorldApp({ world, staticRoot, startLoop: false, persistence: false, loop: { apiKey: '' } })
+	const server = app.listen(0)
+	await waitForListening(server)
+
+	try {
+		const { port } = server.address()
+		const response = await fetch(`http://127.0.0.1:${port}/api/live/health`)
+		const health = await response.json()
+
+		assert.strictEqual(response.status, 200)
+		assert.strictEqual(health.build.gitSha, 'abc1234packaged')
+	} finally {
+		await new Promise(resolve => server.close(resolve))
+	}
+})
+
 test('admin reset is token guarded and replaces the shared live world', async () => {
 	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 4, y: 4 }, turn: 37 }))
 	const persistence = createWorldPersistence(fs.mkdtempSync(path.join(os.tmpdir(), 'goblinworld-reset-')))
