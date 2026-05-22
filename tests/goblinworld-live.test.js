@@ -4796,6 +4796,20 @@ test('loads real Mulberry Town collision from external tileset metadata', () => 
 	assert.strictEqual(new GoblinWorld(worldState).isBlocked({ x: 6, y: 10 }), true)
 })
 
+test('treats Mulberry Town garden crop rows as blocked', () => {
+	const tiledMap = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public/maps/mulberryTown.json'), 'utf8'))
+	const worldState = createWorldFromTiledMap(tiledMap, {
+		name: 'Mulberry Garden Collision',
+		staticRoot: path.join(__dirname, '..')
+	})
+	const world = new GoblinWorld(worldState)
+
+	assert.strictEqual(world.isBlocked({ x: 7, y: 49 }), true)
+	assert.strictEqual(world.isBlocked({ x: 11, y: 51 }), true)
+	assert.strictEqual(world.isBlocked({ x: 5, y: 49 }), false)
+	assert.strictEqual(world.isBlocked({ x: 9, y: 49 }), false)
+})
+
 test('preserves Tiled NPC metadata for live-world actor behavior', () => {
 	const worldState = createWorldFromTiledMap(
 		{

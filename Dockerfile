@@ -6,7 +6,7 @@ ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-COPY babel.config.js ./
+COPY babel.config.js vue.config.js postcss.config.js ./
 COPY public ./public
 COPY src ./src
 

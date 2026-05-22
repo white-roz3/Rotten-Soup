@@ -44,6 +44,12 @@ const DIRECTIONS = {
 	west: { x: -1, y: 0 },
 	north: { x: 0, y: -1 }
 }
+const SEMANTIC_BLOCKED_TILE_IDS = new Set([
+	// Farm crop and shrub variants in the DawnLike sheet. They lack explicit
+	// blocked metadata, but visually read as garden objects, not walkable floor.
+	1602, 1604, 1605, 1607, 1609, 1611, 1615,
+	1726, 1727, 1729
+])
 
 function clone(value) {
 	return JSON.parse(JSON.stringify(value))
@@ -457,6 +463,7 @@ function isCollisionLayer(layer) {
 function tileBlocksMovement(tileId, propertiesById) {
 	if (!tileId) return false
 	const properties = propertiesById.get(tileId)
+	if (SEMANTIC_BLOCKED_TILE_IDS.has(tileId)) return true
 	return normalizeBoolean(properties && properties.blocked, false)
 }
 
