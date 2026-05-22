@@ -1602,6 +1602,8 @@ test('Railway Docker image builds frontend from source instead of stale railway_
 	const dockerignore = fs.readFileSync(path.join(__dirname, '..', '.dockerignore'), 'utf8')
 
 	assert.match(dockerfile, /npm\s+run\s+build/)
+	assert.match(dockerfile, /npm\s+install\s+express@4\.17\.1/)
+	assert.doesNotMatch(dockerfile, /npm\s+ci\s+--omit=dev/)
 	assert.match(dockerfile, /COPY\s+--from=frontend-build\s+\/app\/dist\s+\.\/dist/)
 	assert.doesNotMatch(dockerfile, /COPY\s+railway_dist\s+\.\/dist/)
 	assert.match(dockerignore, /^dist\/$/m)

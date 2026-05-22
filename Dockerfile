@@ -17,8 +17,8 @@ FROM node:20.20.2-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund \
+RUN npm init -y >/dev/null 2>&1 \
+	&& npm install express@4.17.1 --omit=dev --no-audit --no-fund --package-lock=false \
 	&& npm cache clean --force
 
 COPY server.js ./server.js
