@@ -1231,6 +1231,16 @@ test('current story quests use authored scripts instead of generated task blurbs
 	assert.deepStrictEqual(generated, [])
 })
 
+test('current story quest scripts provide multi-beat conversations', () => {
+	const taskIds = new Set(STORY_PHASES.flatMap(phase => phase.tasks.map(task => task.id)))
+	const tooThin = Object.entries(require('../server/goblinworld/story').SCENE_SCRIPTS)
+		.filter(([scriptId]) => taskIds.has(scriptId))
+		.filter(([, script]) => !Array.isArray(script.beats) || script.beats.length < 2)
+		.map(([scriptId]) => scriptId)
+
+	assert.deepStrictEqual(tooThin, [])
+})
+
 test('every authored scene beat includes a Chatty reply', () => {
 	const missing = Object.entries(require('../server/goblinworld/story').SCENE_SCRIPTS)
 		.flatMap(([scriptId, script]) => (script.beats || [])
@@ -1239,6 +1249,146 @@ test('every authored scene beat includes a Chatty reply', () => {
 		)
 
 	assert.deepStrictEqual(missing, [])
+})
+
+test('dialogue objectives wait for authored conversation before completing', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			name: 'Conversation Gate',
+			width: 5,
+			height: 5,
+			tiles: [
+				[1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1]
+			],
+			actors: [
+				{
+					id: 'bartender',
+					name: 'Bartender',
+					entityType: 'NPC',
+					dialog: 'BARTENDER',
+					wanders: false,
+					x: 3,
+					y: 2,
+					home: { x: 3, y: 2 },
+					spriteId: 400,
+					spriteKey: 'bartender'
+				}
+			],
+			blocked: []
+		},
+		goblin: { x: 2, y: 2 },
+		turn: 3,
+		story: {
+			phaseId: 'phase-1',
+			lastPhaseAnnounced: 'phase-1',
+			completedTasks: ['phase-1-test-body']
+		}
+	}))
+
+	const blocked = world.applyDecision({
+		action: 'interact',
+		target: { id: 'bartender', name: 'Bartender', reached: true, questId: 'phase-1-find-voice' },
+		goblinUtterance: 'Bartender, I have questions with ears.',
+		controller: 'fallback'
+	})
+
+	assert.strictEqual(blocked.controller, 'dialogue-hold')
+	assert.strictEqual(world.getSnapshot().story.facts.findASpeakingNpc, undefined)
+	assert.strictEqual(blocked.toJSON().feed, null)
+
+	for (let index = 0; index < 3; index += 1) {
+		const events = world.advanceNpcs({
+			dialogueRadius: 2,
+			dialogueCooldownTurns: 0,
+			maxNpcSpeechEventsPerTurn: 1
+		})
+		assert.strictEqual(events.length, 2)
+		assert.strictEqual(events[0].actor, 'Bartender')
+		assert.strictEqual(events[1].actor, 'Chatty, the chosen one')
+		if (index < 2) {
+			assert.strictEqual(world.getSnapshot().story.facts.firstVoice, undefined)
+		}
+	}
+
+	assert.strictEqual(world.getSnapshot().story.facts.firstVoice, true)
+	world.advanceStory()
+	assert.notStrictEqual(world.getTasks().find(task => task.status === 'active' || task.status === 'combat').id, 'phase-1-find-voice')
+})
+
+test('NPC speaker arbitration follows the next authored beat instead of nearest random participant', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			name: 'Ordered Conversation',
+			width: 7,
+			height: 5,
+			tiles: [
+				[1, 1, 1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1, 1, 1],
+				[1, 1, 1, 1, 1, 1, 1]
+			],
+			actors: [
+				{
+					id: 'dwarf',
+					name: 'Dwarf Bili',
+					entityType: 'NPC',
+					dialog: 'DWARF_BILI',
+					wanders: false,
+					x: 3,
+					y: 2,
+					home: { x: 3, y: 2 },
+					spriteId: 401,
+					spriteKey: 'dwarf'
+				},
+				{
+					id: 'bartender',
+					name: 'Bartender',
+					entityType: 'NPC',
+					dialog: 'BARTENDER',
+					wanders: false,
+					x: 4,
+					y: 2,
+					home: { x: 4, y: 2 },
+					spriteId: 400,
+					spriteKey: 'bartender'
+				}
+			],
+			blocked: []
+		},
+		goblin: { x: 2, y: 2 },
+		turn: STORY_TURNS_PER_PHASE + 20,
+		story: {
+			phaseId: 'phase-2',
+			lastPhaseAnnounced: 'phase-2',
+			completedTasks: ['phase-2-speak-mayor', 'phase-2-inspect-town'],
+			scene: {
+				sceneId: 'phase-2.phase-2-recover-ledger.dialogue',
+				sceneType: 'dialogue',
+				phaseId: 'phase-2',
+				questId: 'phase-2-recover-ledger',
+				participants: ['chatty', 'bartender', 'mayor', 'dwarf']
+			}
+		}
+	}))
+
+	const activeTask = world.getTasks().find(task => task.status === 'active' || task.status === 'combat')
+	assert.strictEqual(activeTask.id, 'phase-2-recover-ledger')
+
+	const events = world.advanceNpcs({
+		dialogueRadius: 3,
+		dialogueCooldownTurns: 0,
+		maxNpcSpeechEventsPerTurn: 1
+	})
+
+	assert.strictEqual(events.length, 2)
+	assert.strictEqual(events[0].actor, 'Bartender')
+	assert.match(events[0].message, /sour barrels hide the cellar door/)
+	assert.strictEqual(events[1].actor, 'Chatty, the chosen one')
 })
 
 test('dialogue scenes do not fall back to unrelated nearby NPC chatter', () => {
@@ -1691,9 +1841,9 @@ test('Railway Docker image builds frontend from source instead of stale railway_
 	const dockerignore = fs.readFileSync(path.join(__dirname, '..', '.dockerignore'), 'utf8')
 
 	assert.match(dockerfile, /npm\s+run\s+build/)
-	assert.match(dockerfile, /AS\s+production-deps/)
-	assert.match(dockerfile, /npm\s+ci\s+--omit=dev/)
-	assert.match(dockerfile, /COPY\s+--from=production-deps\s+\/app\/node_modules\s+\.\/node_modules/)
+	assert.doesNotMatch(dockerfile, /AS\s+production-deps/)
+	assert.doesNotMatch(dockerfile, /COPY\s+--from=production-deps\s+\/app\/node_modules\s+\.\/node_modules/)
+	assert.match(dockerfile, /npm\s+install\s+--omit=dev\s+--no-audit\s+--no-fund\s+express@4\.16\.4/)
 	assert.doesNotMatch(dockerfile, /npm\s+install\s+express@4\.17\.1/)
 	assert.match(dockerfile, /COPY\s+--from=frontend-build\s+\/app\/dist\s+\.\/dist/)
 	assert.doesNotMatch(dockerfile, /COPY\s+railway_dist\s+\.\/dist/)

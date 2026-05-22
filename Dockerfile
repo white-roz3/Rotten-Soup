@@ -12,22 +12,13 @@ COPY src ./src
 
 RUN npm run build
 
-FROM node:20.20.2-bookworm-slim AS production-deps
-
-WORKDIR /app
-ENV NODE_ENV=production
-
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund \
-	&& npm cache clean --force
-
 FROM node:20.20.2-bookworm-slim
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json ./
-COPY --from=production-deps /app/node_modules ./node_modules
+RUN npm install --omit=dev --no-audit --no-fund express@4.16.4 \
+	&& npm cache clean --force
 COPY server.js ./server.js
 COPY server ./server
 COPY public/maps ./public/maps

@@ -336,7 +336,7 @@ function normalizeQuestId(value = '') {
 function getScriptId(context = {}) {
 	const scene = context.scene || {}
 	const activeTask = context.activeTask || {}
-	return scene.questId || activeTask.id || ''
+	return activeTask.id || scene.questId || ''
 }
 
 function getSceneScript(context = {}) {
@@ -350,6 +350,32 @@ function getSceneScriptParticipants(script = {}) {
 
 function hasSceneScript(context = {}) {
 	return Boolean(getSceneScript(context))
+}
+
+function getNextSceneScriptBeat(story = {}, context = {}) {
+	const script = getSceneScript(context)
+	if (!script) return null
+	const dialogue = story.dialogue && typeof story.dialogue === 'object' ? story.dialogue : {}
+	const spoken = new Set(Array.isArray(dialogue.spokenLines) ? dialogue.spokenLines : [])
+	const beatIndex = script.beats.findIndex((beat, index) => !spoken.has(getSceneLineId(script.id, beat.speaker, index)))
+	if (beatIndex < 0) return null
+	return {
+		script,
+		beat: script.beats[beatIndex],
+		beatIndex,
+		participants: getSceneScriptParticipants(script)
+	}
+}
+
+function getNextSceneScriptSpeaker(story = {}, context = {}) {
+	const next = getNextSceneScriptBeat(story, context)
+	return next && next.beat ? next.beat.speaker : null
+}
+
+function isSceneScriptComplete(story = {}, context = {}) {
+	const script = getSceneScript(context)
+	if (!script) return true
+	return !getNextSceneScriptBeat(story, context)
 }
 
 function applyUnlock(story, unlock) {
@@ -389,8 +415,8 @@ function selectSceneScriptDialogue(identity, story, turn = 0, context = {}) {
 		}
 	}
 	const spoken = new Set(Array.isArray(dialogue.spokenLines) ? dialogue.spokenLines : [])
-	const beatIndex = script.beats.findIndex((beat, index) => !spoken.has(getSceneLineId(script.id, beat.speaker, index)))
-	if (beatIndex < 0) {
+	const nextBeat = getNextSceneScriptBeat(story, context)
+	if (!nextBeat) {
 		return {
 			story,
 			line: null,
@@ -403,7 +429,8 @@ function selectSceneScriptDialogue(identity, story, turn = 0, context = {}) {
 			participants
 		}
 	}
-	const beat = script.beats[beatIndex]
+	const beatIndex = nextBeat.beatIndex
+	const beat = nextBeat.beat
 	if (beat.speaker !== identity.storyKey) {
 		return {
 			story,
@@ -441,7 +468,11 @@ function selectSceneScriptDialogue(identity, story, turn = 0, context = {}) {
 	})
 	story.dialogue = dialogue
 	uniquePush(story.callbacks, `scene-script:${script.id}`)
-	;(beat.unlocks || []).forEach(unlock => applyUnlock(story, unlock))
+	if (beatIndex >= script.beats.length - 1) {
+		script.beats
+			.flatMap(scriptBeat => scriptBeat.unlocks || [])
+			.forEach(unlock => applyUnlock(story, unlock))
+	}
 
 	return {
 		story,
@@ -516,9 +547,11 @@ module.exports = {
 	CHATTY_NARRATION: clone(CHATTY_NARRATION),
 	SCENE_SCRIPTS: clone(SCENE_SCRIPTS),
 	getChattyFallbackNarration,
+	getNextSceneScriptSpeaker,
 	getSceneScriptCoverage,
 	getSceneScriptParticipants,
 	getSceneScriptStats,
 	hasSceneScript,
+	isSceneScriptComplete,
 	selectSceneScriptDialogue
 }

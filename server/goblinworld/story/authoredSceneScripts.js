@@ -608,6 +608,400 @@ const AUTHORED_SCENE_SCRIPTS = {
 	}
 }
 
+const SCRIPT_FOLLOW_UP_BEATS = {
+	'phase-1-test-body': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, if a step fails, stop, look down, and choose another tile. Prophecy still has to respect floors.',
+			chatty: 'Chatty: I accept floor law until I can improve it.'
+		}
+	],
+	'phase-1-learn-name': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, a name spoken by a wall is not a crown. Ask who benefits before you obey it.',
+			chatty: 'Chatty: I will wear the name, not let the name wear me.'
+		}
+	],
+	'phase-1-reach-town': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, take the road between the signs. If anyone calls that suspicious, tell them I was professionally tired.',
+			chatty: 'Chatty: I respect official exhaustion as a travel permit.'
+		}
+	],
+	'phase-1-inspect-well': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, if the well says a name twice, answer nothing. Repetition is how old magic measures fear.',
+			chatty: 'Chatty: I will let the well do all the embarrassing talking.'
+		}
+	],
+	'phase-1-find-snack-law': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, second snack rule. If Mayor Leonard wrote the warning, the snack survived politics and deserves respect.',
+			chatty: 'Chatty: I will inspect the snack for civic trauma.'
+		}
+	],
+	'phase-1-choose-first-goal': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, your first goal should leave proof behind. A witness, a mark, a rescued crumb, anything real.',
+			chatty: 'Chatty: I choose evidence with mud on it.'
+		}
+	],
+	'phase-2-inspect-town': [
+		{
+			speaker: 'marketTrader',
+			line: 'Market Trader: Chatty, start where people forgot to lie neatly. Check the bar shelf, the back market crate, then the old store room.',
+			chatty: 'Chatty: I will follow sloppy lies until they become a map.'
+		}
+	],
+	'phase-2-hidden-goblins': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, do not shout rescue at a hiding place. Knock softly and let the hidden decide the speed of trust.',
+			chatty: 'Chatty: Quiet rescue. Loud consequences later.'
+		}
+	],
+	'phase-2-mark-names': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, mark names beside where each person might return. A list without a road is just another trap.',
+			chatty: 'Chatty: Every name gets a road out.'
+		}
+	],
+	'phase-2-challenge-paper-law': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, mock the law after you know its hinge. Break the hinge, then make the joke public.',
+			chatty: 'Chatty: I will be funny in the structurally important place.'
+		}
+	],
+	'phase-2-hide-ledger-copy': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, if one copy burns, the second copy should already be annoying someone honest.',
+			chatty: 'Chatty: I spread truth like inconvenient mold.'
+		}
+	],
+	'phase-3-three-villagers': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, ask each wanderer what they avoid. The same answer from three mouths becomes a trail.',
+			chatty: 'Chatty: I will interrogate avoidance with polite feet.'
+		}
+	],
+	'phase-3-dwarf-charm': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, the charm is under the broken cart, unless shame moved it. Shame is quick when nobody looks.',
+			chatty: 'Chatty: Then I look where shame thinks it is clever.'
+		}
+	],
+	'phase-3-bramble-crawlers': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, if the bramble leans before you step, it is already hunting. Move aside, then strike the root knot.',
+			chatty: 'Chatty: Root knot gets first appointment with trouble.'
+		}
+	],
+	'phase-3-freedom-task': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, your task is not to collect goblins. It is to make return feel less dangerous than hiding.',
+			chatty: 'Chatty: I will make the road safer than the shadow.'
+		}
+	],
+	'phase-3-recruit-pathfinder': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, if I guide you, you listen when the moss says turn. It has better memory than pride.',
+			chatty: 'Chatty: I accept moss as senior navigation staff.'
+		}
+	],
+	'phase-3-confront-revenge-question': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, when people cheer you, ask what they expect you to hurt. That answer matters.',
+			chatty: 'Chatty: I will not become a weapon just because applause has hands.'
+		}
+	],
+	'phase-3-save-road-cache': [
+		{
+			speaker: 'marketTrader',
+			line: 'Market Trader: Chatty, hide supplies where frightened people naturally pause, not where brave people pose.',
+			chatty: 'Chatty: The cache goes where knees remember fear.'
+		}
+	],
+	'phase-4-find-group-one': [
+		{
+			speaker: 'hiddenGoblinOne',
+			line: 'Hidden Goblin Pip: Chatty, if you step on the loose board, we run. If you avoid it, we might believe your eyes work.',
+			chatty: 'Chatty: I will impress the board by not becoming its problem.'
+		}
+	],
+	'phase-4-find-group-two': [
+		{
+			speaker: 'hiddenGoblinTwo',
+			line: 'Hidden Goblin Muck: Chatty, bring no guard voice, no mayor voice, and no heroic shouting. Bring a joke with a door in it.',
+			chatty: 'Chatty: Knock knock. It is suspicious freedom.'
+		}
+	],
+	'phase-4-find-group-three': [
+		{
+			speaker: 'hiddenGoblinThree',
+			line: 'Hidden Goblin Nib: Chatty, the blue smoke fades if watched by strangers. Walk past once, then return like you forgot something.',
+			chatty: 'Chatty: I am excellent at looking accidentally useful.'
+		}
+	],
+	'phase-4-say-phrase': [
+		{
+			speaker: 'hiddenGoblinOne',
+			line: 'Hidden Goblin Pip: Chatty, say it again after we answer. Some truths need to hear themselves survive a room.',
+			chatty: 'Chatty: Small does not mean owned, even when the room gets nervous.'
+		}
+	],
+	'phase-4-crown-hounds': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, hounds turn wide before they bite. Hold the corner and make their training expensive.',
+			chatty: 'Chatty: I will invoice the bite dogs in bruises.'
+		}
+	],
+	'phase-4-escort-group': [
+		{
+			speaker: 'hiddenGoblinTwo',
+			line: 'Hidden Goblin Muck: Chatty, if one of us freezes, do not drag. Stand beside us until the road stops looking hungry.',
+			chatty: 'Chatty: Nobody gets pulled into freedom by the ankles.'
+		}
+	],
+	'phase-4-create-freedom-list': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, leave blank spaces on the list. Freedom must have room for names we have not earned yet.',
+			chatty: 'Chatty: Blank space becomes an invitation, not a trap.'
+		}
+	],
+	'phase-4-let-goblins-refuse': [
+		{
+			speaker: 'hiddenGoblinThree',
+			line: 'Hidden Goblin Nib: Chatty, if your freedom survives my no, I might trust your yes later.',
+			chatty: 'Chatty: Your no is safe with me.'
+		}
+	],
+	'phase-5-gather-cloth': [
+		{
+			speaker: 'marketTrader',
+			line: 'Market Trader: Chatty, do not take the fancy cloth. Fancy cloth attracts speeches. Take the sturdy one that survives weather.',
+			chatty: 'Chatty: The banner chooses stamina over drama.'
+		}
+	],
+	'phase-5-gather-glass': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, wrap the glass in cloth before you run. A signal that cuts your hand teaches the wrong lesson.',
+			chatty: 'Chatty: I protect the tiny dawn from my own enthusiasm.'
+		}
+	],
+	'phase-5-gather-ink': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, blackroot stains deeper if you ask nicely. Luckily, roots respect knives more than manners.',
+			chatty: 'Chatty: I bring a knife with respectful intentions.'
+		}
+	],
+	'phase-5-rebel-toast': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, repeat the toast only when someone scared can hear it. Brave people already clap too loudly.',
+			chatty: 'Chatty: I toast for the quiet knees in the room.'
+		}
+	],
+	'phase-5-armory-route': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, once inside, take shields before blades. A rebellion that survives can always sharpen things later.',
+			chatty: 'Chatty: Defense first, dramatic stabbing second.'
+		}
+	],
+	'phase-5-pantry-slime': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, slime splits when poked badly. Hit the jar shelf and make the salt do honest work.',
+			chatty: 'Chatty: I weaponize seasoning for the people.'
+		}
+	],
+	'phase-5-armor-scraps': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, armor scraps hate magnets, loud insults, and being remembered as spare parts.',
+			chatty: 'Chatty: I will insult the metal with tactical accuracy.'
+		}
+	],
+	'phase-6-protect-wanderers': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, keep the witnesses between lanterns. Darkness is where patrols edit stories.',
+			chatty: 'Chatty: I keep the truth in bad lighting as little as possible.'
+		}
+	],
+	'phase-6-rally-bartender': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, if the tavern closes, I can feed fighters through the back window and call it ventilation.',
+			chatty: 'Chatty: Revolutionary ventilation smells like stew.'
+		}
+	],
+	'phase-6-rally-bili': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, do not thank me yet. Make me useful first, then unbearable later.',
+			chatty: 'Chatty: I assign you to useful immediately and unbearable by sunset.'
+		}
+	],
+	'phase-6-rally-guard': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, if I stand with you, the square will see permission crack. Use that crack.',
+			chatty: 'Chatty: I will wedge freedom into the official crack.'
+		}
+	],
+	'phase-6-keep-chatty-alive': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, retreat is not shame if it keeps the lamp moving. Dead courage casts no light.',
+			chatty: 'Chatty: I will stay alive with obnoxious tactical grace.'
+		}
+	],
+	'phase-6-count-clean-fights': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, inspect the first wave, punish the second, save strength for the third. Panic spends too fast.',
+			chatty: 'Chatty: My panic will submit receipts before acting.'
+		}
+	],
+	'phase-6-open-relief-route': [
+		{
+			speaker: 'marketTrader',
+			line: 'Market Trader: Chatty, once the back route opens, move bandages before banners. People forgive ugly symbols. Wounds do not.',
+			chatty: 'Chatty: Bandages get priority over glorious waving.'
+		}
+	],
+	'phase-7-find-stair': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, the lintel stone has three nail marks. Press the middle one and step back like you respect consequences.',
+			chatty: 'Chatty: I press history, then dodge its opinion.'
+		}
+	],
+	'phase-7-take-lamp': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, when the lamp turns white, someone nearby is telling the truth by accident.',
+			chatty: 'Chatty: I will watch for accidental honesty and grab it.'
+		}
+	],
+	'phase-7-enter-under-road': [
+		{
+			speaker: 'dwarf',
+			line: 'Dwarf Bili: Chatty, count turns underground by breath, not bravery. Bravery lies when ceilings get low.',
+			chatty: 'Chatty: I trust lungs over speeches.'
+		}
+	],
+	'phase-7-ledger-warden': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, if the Warden recites a debt, answer with a name. Names weigh more than numbers down there.',
+			chatty: 'Chatty: I throw names like stones with birthdays.'
+		}
+	],
+	'phase-7-break-binding-stone': [
+		{
+			speaker: 'hiddenGoblinTwo',
+			line: 'Hidden Goblin Muck: Chatty, after the stone cracks, do not cheer first. Listen for who can breathe again.',
+			chatty: 'Chatty: Breathing gets the first celebration.'
+		}
+	],
+	'phase-7-hear-names-return': [
+		{
+			speaker: 'hiddenGoblinThree',
+			line: 'Hidden Goblin Nib: Chatty, when a name returns, it comes back shy. Do not make it perform.',
+			chatty: 'Chatty: I will let the names sit down before history applauds.'
+		}
+	],
+	'phase-7-refuse-ledger-crown': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, refuse it where witnesses can see. Private virtue is too easy for power to edit.',
+			chatty: 'Chatty: I reject the crown loudly and with witnesses.'
+		}
+	],
+	'phase-8-return-square': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, hand me no absolution in the square. Make me answer where everyone can hear.',
+			chatty: 'Chatty: Public guilt gets public homework.'
+		}
+	],
+	'phase-8-rally-goblins': [
+		{
+			speaker: 'hiddenGoblinOne',
+			line: 'Hidden Goblin Pip: Chatty, if we stand, stand beside us, not in front like a door pretending to be a person.',
+			chatty: 'Chatty: Beside, not above. Door behavior rejected.'
+		}
+	],
+	'phase-8-rally-townsfolk': [
+		{
+			speaker: 'marketTrader',
+			line: 'Market Trader: Chatty, I can make caution useful. Give frightened townsfolk jobs small enough to begin.',
+			chatty: 'Chatty: Tiny jobs become a crowd with pockets.'
+		}
+	],
+	'phase-8-crown-remnant': [
+		{
+			speaker: 'stoneGuard',
+			line: 'Stone Guard: Chatty, when the Remnant orders kneeling, move first. Orders hate feet with timing.',
+			chatty: 'Chatty: My feet decline the monarchy.'
+		}
+	],
+	'phase-8-speak-proclamation': [
+		{
+			speaker: 'hoodedVillager',
+			line: 'Hooded Villager: Chatty, after the joke, say the serious part twice. People remember laughter, but law remembers wording.',
+			chatty: 'Chatty: Small does not mean owned. Freedom is not permission.'
+		}
+	],
+	'phase-8-set-next-goal': [
+		{
+			speaker: 'forestWanderer',
+			line: 'Forest Wanderer: Chatty, name tomorrow by a place, not a mood. Roads need destinations more than slogans.',
+			chatty: 'Chatty: Tomorrow starts with a map, then earns its poetry.'
+		}
+	],
+	'phase-8-avoid-tyrant-choice': [
+		{
+			speaker: 'mayor',
+			line: 'Mayor Leonard: Chatty, make a council before anyone makes a throne. Empty chairs protect better than full crowns.',
+			chatty: 'Chatty: I vote for chairs with suspicious independence.'
+		}
+	],
+	'phase-8-open-roads': [
+		{
+			speaker: 'lanternKeeper',
+			line: 'Lantern Keeper: Chatty, the first open road will frighten people. Leave lamps along it so fear can find its way home.',
+			chatty: 'Chatty: I light the road for everyone still negotiating with courage.'
+		}
+	]
+}
+
+Object.entries(SCRIPT_FOLLOW_UP_BEATS).forEach(([scriptId, beats]) => {
+	if (AUTHORED_SCENE_SCRIPTS[scriptId]) {
+		AUTHORED_SCENE_SCRIPTS[scriptId].beats.push(...beats)
+	}
+})
+
 module.exports = {
 	AUTHORED_SCENE_SCRIPTS
 }

@@ -32,6 +32,9 @@ const {
 	getStoryNpcDialogueLine,
 	getStorySnapshot,
 	getStoryTasks,
+	getNextSceneScriptSpeaker,
+	hasSceneScript,
+	isSceneScriptComplete,
 	normalizeStoryState,
 	SCENE_SCRIPTS,
 	selectStoryNpcDialogueLine
@@ -224,9 +227,18 @@ function actorMatchesDialogueTarget(actor, target = {}) {
 	return false
 }
 
-function isNpcRelevantToCurrentConversation(actor, activeTask, scene = {}, options = {}) {
+function getCurrentScriptContext(story, activeTask, scene = {}) {
+	return {
+		scene,
+		activeTask
+	}
+}
+
+function isNpcRelevantToCurrentConversation(actor, activeTask, scene = {}, options = {}, story = {}) {
 	if (options.allowAmbientNpcDialogue) return true
 	const actorKey = getActorStoryKey(actor)
+	const nextScriptSpeaker = getNextSceneScriptSpeaker(story, getCurrentScriptContext(story, activeTask, scene))
+	if (nextScriptSpeaker) return actorKey === nextScriptSpeaker
 	const sceneParticipants = Array.isArray(scene.participants)
 		? scene.participants.filter(participant => participant && participant !== 'chatty')
 		: []
@@ -858,6 +870,12 @@ class GoblinWorld {
 		if (decision.target && decision.target.questId && decision.target.questId !== task.id) {
 			return { applied: false, eventPatch: null }
 		}
+		const gatedKinds = new Set(['dialogue', 'rumor', 'ally', 'speech', 'goal', 'choice', 'ideology'])
+		const taskKind = task.target && task.target.kind
+		const scriptContext = getCurrentScriptContext(this.state.story, task, this.state.story.scene)
+		if (gatedKinds.has(taskKind) && hasSceneScript(scriptContext) && !isSceneScriptComplete(this.state.story, scriptContext)) {
+			return { applied: false, eventPatch: null, waitingForConversation: true }
+		}
 		const navigation = this.getSnapshot().story.navigation
 		const result = applyQuestInteraction(this.state.story, task, {
 			action: decision.action,
@@ -916,6 +934,8 @@ class GoblinWorld {
 		const events = []
 		const speakingActorIds = new Set()
 		const activeEncounter = getActiveStoryEncounter(this.state.story)
+		const activeTask = this.getTasks().find(task => task.status === 'active' || task.status === 'combat')
+		const nextScriptSpeaker = getNextSceneScriptSpeaker(this.state.story, getCurrentScriptContext(this.state.story, activeTask, this.state.story.scene))
 
 		if (activeEncounter) {
 			const supportActor = rotateActors(
@@ -953,12 +973,15 @@ class GoblinWorld {
 		}
 
 		if (dialogueRadius > 0 && maxSpeechEvents > 0) {
-			const activeTask = this.getTasks().find(task => task.status === 'active' || task.status === 'combat')
 			const nearbySpeakers = actors
 				.filter(actor => isNpc(actor) && manhattanDistance(actor, this.state.goblin.position) <= dialogueRadius)
-				.filter(actor => isNpcRelevantToCurrentConversation(actor, activeTask, this.state.story.scene, options))
+				.filter(actor => isNpcRelevantToCurrentConversation(actor, activeTask, this.state.story.scene, options, this.state.story))
 				.filter(actor => !Number.isInteger(actor.lastSpeechTurn) || this.state.turn - actor.lastSpeechTurn >= dialogueCooldownTurns)
-				.sort((a, b) => manhattanDistance(a, this.state.goblin.position) - manhattanDistance(b, this.state.goblin.position) || actorSortKey(a).localeCompare(actorSortKey(b)))
+				.sort((a, b) => {
+					const aIsNext = nextScriptSpeaker && getActorStoryKey(a) === nextScriptSpeaker ? 0 : 1
+					const bIsNext = nextScriptSpeaker && getActorStoryKey(b) === nextScriptSpeaker ? 0 : 1
+					return aIsNext - bIsNext || manhattanDistance(a, this.state.goblin.position) - manhattanDistance(b, this.state.goblin.position) || actorSortKey(a).localeCompare(actorSortKey(b))
+				})
 				.slice(0, maxSpeechEvents)
 
 			nearbySpeakers.forEach(actor => {
@@ -1329,7 +1352,7 @@ class GoblinWorld {
 				target: questResult.eventPatch && questResult.eventPatch.target ? questResult.eventPatch.target : decision.target || null,
 				message: decision.goblinUtterance || 'The goblin waits and listens.',
 				publicRationale: decision.publicRationale || (questResult.eventPatch && questResult.eventPatch.publicRationale) || '',
-				controller: questResult.eventPatch && questResult.eventPatch.controller ? questResult.eventPatch.controller : controller,
+				controller: questResult.waitingForConversation ? 'dialogue-hold' : questResult.eventPatch && questResult.eventPatch.controller ? questResult.eventPatch.controller : controller,
 				worldDelta: mergeWorldDelta(questResult.eventPatch && questResult.eventPatch.worldDelta, {
 					goblin: {
 						position: this.state.goblin.position,
@@ -1350,12 +1373,12 @@ class GoblinWorld {
 		this.state.goblin.animation = DEFAULT_ANIMATION
 		this.state.goblin.movementState = getIdleMovementStateForDecision(decision)
 		return this.appendEvent({
-			type: questResult.eventPatch ? questResult.eventPatch.type : decision.action === 'inspect' ? 'thought' : 'action',
+			type: questResult.waitingForConversation ? 'thought' : questResult.eventPatch ? questResult.eventPatch.type : decision.action === 'inspect' ? 'thought' : 'action',
 			action: decision.action,
 			target: questResult.eventPatch && questResult.eventPatch.target ? questResult.eventPatch.target : decision.target || null,
 			message: decision.goblinUtterance || (questResult.eventPatch && questResult.eventPatch.message) || (classicResult && classicResult.eventPatch && classicResult.eventPatch.message) || `The goblin tries to ${decision.action}.`,
 			publicRationale: decision.publicRationale || (questResult.eventPatch && questResult.eventPatch.publicRationale) || '',
-			controller: questResult.eventPatch && questResult.eventPatch.controller ? questResult.eventPatch.controller : controller,
+			controller: questResult.waitingForConversation ? 'dialogue-hold' : questResult.eventPatch && questResult.eventPatch.controller ? questResult.eventPatch.controller : controller,
 			worldDelta: mergeWorldDelta(classicResult && classicResult.worldDelta, questResult.eventPatch && questResult.eventPatch.worldDelta, {
 				goblin: {
 					position: this.state.goblin.position,
