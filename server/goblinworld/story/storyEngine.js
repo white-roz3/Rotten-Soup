@@ -756,7 +756,7 @@ function selectStoryNpcDialogueLine(actor, storyInput, turn = 0, context = {}) {
 	const actorKey = getActorStoryKey(actor)
 	const phase = getPhase(story.phaseId)
 	const category = pickCategory(story, actorKey, { ...context, turn })
-	const requireSceneScript = Boolean(context.scene || context.activeTask)
+	const requireSceneScript = Boolean(context.scene || context.activeTask) && !context.allowAmbientDialogue
 	const scripted = selectScriptedConversationLine(actor, story, turn, {
 		...context,
 		activeTask: context.activeTask || getCurrentStoryTask(story, turn),
@@ -764,7 +764,10 @@ function selectStoryNpcDialogueLine(actor, storyInput, turn = 0, context = {}) {
 		requireSceneScript
 	})
 	story = scripted.story
-	const fallbackLine = scripted.line || scripted.sceneScriptOnly ? null : selectLineWithoutRecentRepeat(story, actorKey, phase.id, category, turn)
+	const allowAmbientDialogue = !requireSceneScript || Boolean(context.allowAmbientDialogue)
+	const fallbackLine = scripted.line || scripted.sceneScriptOnly || !allowAmbientDialogue
+		? null
+		: selectLineWithoutRecentRepeat(story, actorKey, phase.id, category, turn)
 	const line = scripted.line || fallbackLine
 	if (!line) {
 		return {

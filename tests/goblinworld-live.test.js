@@ -823,7 +823,10 @@ test('dialogue picker still provides a Chatty follow-up when falling back to rot
 		}
 	}, turn)
 
-	const result = selectStoryNpcDialogueLine(actor, story, turn, { scene: story.scene })
+	const result = selectStoryNpcDialogueLine(actor, story, turn, {
+		scene: story.scene,
+		allowAmbientDialogue: true
+	})
 	assert.ok(result.line)
 	assert.ok(result.followUp)
 	assert.strictEqual(result.followUp.actor, 'Chatty, the chosen one')
@@ -1219,6 +1222,16 @@ test('scene scripts cover every main story quest', () => {
 	assert.strictEqual(coverage.scriptedCount, coverage.taskCount)
 })
 
+test('every authored scene beat includes a Chatty reply', () => {
+	const missing = Object.entries(require('../server/goblinworld/story').SCENE_SCRIPTS)
+		.flatMap(([scriptId, script]) => (script.beats || [])
+			.map((beat, index) => ({ scriptId, beat, index }))
+			.filter(entry => !entry.beat.chatty)
+		)
+
+	assert.deepStrictEqual(missing, [])
+})
+
 test('dialogue scenes do not fall back to unrelated nearby NPC chatter', () => {
 	const result = selectStoryNpcDialogueLine(
 		{ id: 'guard-1', name: 'Stone Guard', dialog: 'STONE_GUARD' },
@@ -1243,6 +1256,34 @@ test('dialogue scenes do not fall back to unrelated nearby NPC chatter', () => {
 
 	assert.strictEqual(result.line, null)
 	assert.strictEqual(result.lineId, null)
+})
+
+test('active task context suppresses broad dialogue banks when no authored beat applies', () => {
+	const result = selectStoryNpcDialogueLine(
+		{ id: 'trader-1', name: 'Market Trader', dialog: 'MARKET_TRADER', spriteKey: 'marketTrader' },
+		normalizeStoryState({
+			phaseId: 'phase-1',
+			lastPhaseAnnounced: 'phase-1'
+		}, 181),
+		181,
+		{
+			scene: {
+				sceneId: 'phase-1.phase-1-bridge-objective.travel',
+				sceneType: 'travel',
+				phaseId: 'phase-1',
+				questId: 'phase-1-bridge-objective'
+			},
+			activeTask: {
+				id: 'phase-1-bridge-objective',
+				title: 'Keep learning the body',
+				target: { kind: 'route', name: 'phase-1' },
+				bridge: true
+			}
+		}
+	)
+
+	assert.strictEqual(result.line, null)
+	assert.strictEqual(result.followUp, null)
 })
 
 test('story snapshot exposes public dialogue state without line history internals', () => {
@@ -4344,7 +4385,8 @@ test('fallback NPC dialogue produces a Chatty reply so feed reads as conversatio
 	const events = world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 6,
-		maxNpcSpeechEventsPerTurn: 1
+		maxNpcSpeechEventsPerTurn: 1,
+		allowAmbientNpcDialogue: true
 	})
 	const dialogue = events.filter(event => event.type === 'dialogue')
 
@@ -4354,6 +4396,86 @@ test('fallback NPC dialogue produces a Chatty reply so feed reads as conversatio
 	assert.strictEqual(dialogue[1].actor, 'Chatty, the chosen one')
 	assert.strictEqual(dialogue[1].action, 'reply')
 	assert.doesNotMatch(dialogue[1].message, /tell Chatty the useful part|I stop and listen|stay put/i)
+})
+
+test('route bridge objectives do not emit random nearby NPC advice as conversation', () => {
+	const phaseOneTaskIds = STORY_PHASES.find(phase => phase.id === 'phase-1').tasks.map(task => task.id)
+	const world = new GoblinWorld(
+		createInitialWorld({
+			map: {
+				name: 'Market Road',
+				width: 6,
+				height: 5,
+				tiles: [
+					[1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1]
+				],
+				actors: [
+					{
+						id: 'market-trader',
+						name: 'Market Trader',
+						entityType: 'NPC',
+						dialog: 'MARKET_TRADER',
+						wanders: false,
+						x: 3,
+						y: 2,
+						home: { x: 3, y: 2 },
+						spriteId: 400,
+						spriteKey: 'marketTrader'
+					},
+					{
+						id: 'forest-wanderer',
+						name: 'Forest Wanderer',
+						entityType: 'NPC',
+						dialog: 'FOREST_WANDERER',
+						wanders: false,
+						x: 2,
+						y: 3,
+						home: { x: 2, y: 3 },
+						spriteId: 401,
+						spriteKey: 'forestWanderer'
+					}
+				],
+				blocked: []
+			},
+			goblin: { x: 2, y: 2 },
+			turn: 12,
+			story: {
+				phaseId: 'phase-1',
+				completedTasks: phaseOneTaskIds
+			}
+		})
+	)
+
+	const activeTask = world.getTasks().find(task => task.status === 'active' || task.status === 'combat')
+	assert.strictEqual(activeTask.id, 'phase-1-bridge-objective')
+	assert.strictEqual(activeTask.target.kind, 'route')
+
+	const events = world.advanceNpcs({
+		dialogueRadius: 2,
+		dialogueCooldownTurns: 1,
+		maxNpcSpeechEventsPerTurn: 1
+	})
+
+	assert.deepStrictEqual(events.filter(event => event.type === 'dialogue'), [])
+})
+
+test('routine Chatty movement does not enter the public feed as pseudo conversation', () => {
+	const event = createEvent({
+		id: 'move-1',
+		turn: 1,
+		type: 'action',
+		actor: 'Chatty, the chosen one',
+		action: 'move',
+		message: 'I leave the familiar steps behind and test new ground.',
+		publicRationale: 'Chatty explores a nearby route.',
+		controller: 'fallback'
+	}).toJSON()
+
+	assert.strictEqual(event.feed, null)
 })
 
 test('nearby named NPC supports active combat before wandering', () => {

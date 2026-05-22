@@ -105,6 +105,18 @@ function selectScriptedConversationLine(actor, story, turn = 0, context = {}) {
 			activeTask
 		})
 		: null
+	if (shouldUseSceneScript && !sceneScript) {
+		return {
+			story,
+			line: null,
+			lineId: null,
+			conversationId: getConversationId(scene, phaseId, identity.storyKey),
+			followUp: null,
+			identity,
+			sceneScriptOnly: true,
+			participants: []
+		}
+	}
 	if (sceneScript && sceneScript.line) {
 		sceneScript.story.dialogue.spokenLines = sceneScript.story.dialogue.spokenLines.slice(-MAX_SPOKEN_LINES)
 		sceneScript.story.dialogue.conversationHistory = sceneScript.story.dialogue.conversationHistory.slice(-MAX_CONVERSATION_HISTORY)

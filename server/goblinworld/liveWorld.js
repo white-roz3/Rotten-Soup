@@ -27,11 +27,13 @@ const {
 	applyNpcCombatSupport,
 	applyQuestInteraction,
 	applyStoryCombatAction,
+	getActorStoryKey,
 	getActiveStoryEncounter,
 	getStoryNpcDialogueLine,
 	getStorySnapshot,
 	getStoryTasks,
 	normalizeStoryState,
+	SCENE_SCRIPTS,
 	selectStoryNpcDialogueLine
 } = require('./story')
 const CHATTY_NAME = 'Chatty, the chosen one'
@@ -203,6 +205,40 @@ function getNumericOption(options, optionName, fallback) {
 
 function actorSortKey(actor) {
 	return actor.id || `${actor.name}-${actor.x}-${actor.y}`
+}
+
+function getScriptSpeakerKeys(task) {
+	const script = task && task.id ? SCENE_SCRIPTS[task.id] : null
+	if (!script || !Array.isArray(script.beats)) return []
+	return Array.from(new Set(script.beats.map(beat => beat && beat.speaker).filter(Boolean)))
+}
+
+function actorMatchesDialogueTarget(actor, target = {}) {
+	if (!actor || !target) return false
+	if (target.id && actor.id === target.id) return true
+	if (target.dialog && actor.dialog === target.dialog) return true
+	const targetName = String(target.name || target.actor || '').toLowerCase()
+	const actorName = String(actor.name || '').toLowerCase()
+	if (targetName && actorName && actorName.includes(targetName)) return true
+	if (targetName && getActorStoryKey(actor).toLowerCase().includes(targetName.replace(/\s+/g, ''))) return true
+	return false
+}
+
+function isNpcRelevantToCurrentConversation(actor, activeTask, scene = {}, options = {}) {
+	if (options.allowAmbientNpcDialogue) return true
+	const actorKey = getActorStoryKey(actor)
+	const sceneParticipants = Array.isArray(scene.participants)
+		? scene.participants.filter(participant => participant && participant !== 'chatty')
+		: []
+	if (scene.sceneType === 'dialogue' && sceneParticipants.length > 0) {
+		return sceneParticipants.includes(actorKey)
+	}
+	if (!activeTask) return false
+	const target = activeTask.target || {}
+	if (target.kind === 'dialogue') return actorMatchesDialogueTarget(actor, target)
+	const scriptSpeakerKeys = getScriptSpeakerKeys(activeTask)
+	if (!scriptSpeakerKeys.length) return false
+	return scriptSpeakerKeys.includes(actorKey) && scene.sceneType === 'dialogue'
 }
 
 function deterministicDirections(actor, turn) {
@@ -917,16 +953,19 @@ class GoblinWorld {
 		}
 
 		if (dialogueRadius > 0 && maxSpeechEvents > 0) {
+			const activeTask = this.getTasks().find(task => task.status === 'active' || task.status === 'combat')
 			const nearbySpeakers = actors
 				.filter(actor => isNpc(actor) && manhattanDistance(actor, this.state.goblin.position) <= dialogueRadius)
+				.filter(actor => isNpcRelevantToCurrentConversation(actor, activeTask, this.state.story.scene, options))
 				.filter(actor => !Number.isInteger(actor.lastSpeechTurn) || this.state.turn - actor.lastSpeechTurn >= dialogueCooldownTurns)
 				.sort((a, b) => manhattanDistance(a, this.state.goblin.position) - manhattanDistance(b, this.state.goblin.position) || actorSortKey(a).localeCompare(actorSortKey(b)))
 				.slice(0, maxSpeechEvents)
 
 			nearbySpeakers.forEach(actor => {
 				const storyLine = selectStoryNpcDialogueLine(actor, this.state.story, this.state.turn, {
-					activeTask: this.getTasks().find(task => task.status === 'active' || task.status === 'combat'),
-					scene: this.state.story.scene
+					activeTask,
+					scene: this.state.story.scene,
+					allowAmbientDialogue: Boolean(options.allowAmbientNpcDialogue)
 				})
 				this.state.story = storyLine.story
 				if (!storyLine.line) return
