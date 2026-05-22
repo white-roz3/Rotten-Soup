@@ -1,4 +1,21 @@
-const DEFAULT_GOBLIN_ACTIONS = ['move', 'wait', 'interact', 'pick_up', 'attack', 'cast', 'inspect']
+const DEFAULT_GOBLIN_ACTIONS = [
+	'move',
+	'wait',
+	'interact',
+	'pick_up',
+	'pickup',
+	'attack',
+	'cast',
+	'inspect',
+	'examine',
+	'climb',
+	'equip',
+	'use',
+	'fire',
+	'rest',
+	'flee',
+	'reposition'
+]
 
 const GOBLIN_DECISION_SCHEMA = {
 	name: 'goblin_decision',

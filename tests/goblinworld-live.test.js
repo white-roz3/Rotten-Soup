@@ -11,6 +11,7 @@ const {
 	createWorldFromTiledMap
 } = require('../server/goblinworld/liveWorld')
 const {
+	DEFAULT_GOBLIN_ACTIONS,
 	validateGoblinDecision,
 	GOBLIN_DECISION_SCHEMA
 } = require('../server/goblinworld/actionSchema')
@@ -40,6 +41,8 @@ const {
 	getNpcIdentityForActor,
 	getSpeakerLinePools,
 	getChattyFallbackNarration,
+	getCampaignArcSequence,
+	getNextContinuationArcId,
 	getSceneScriptCoverage,
 	normalizeStoryState,
 	selectStoryNpcDialogueLine,
@@ -56,8 +59,16 @@ const {
 	getRegisteredMapIds,
 	getMapIdForPortal,
 	getPortalLinksForTiledMap,
+	getRegisteredMap,
 	loadRegisteredTiledMap
 } = require('../server/goblinworld/mapRegistry')
+const {
+	CANONICAL_CLASSIC_MAP_IDS,
+	applyClassicAction,
+	createClassicStateFromWorld,
+	createClassicGameRuntime,
+	getClassicRuntimeSnapshot
+} = require('../server/goblinworld/classicRuntime')
 
 function readPngInfo(filePath) {
 	const data = fs.readFileSync(filePath)
@@ -153,6 +164,14 @@ function test(name, fn) {
 		})
 }
 
+function waitForListening(server) {
+	if (server.listening) return Promise.resolve()
+	return new Promise((resolve, reject) => {
+		server.once('listening', resolve)
+		server.once('error', reject)
+	})
+}
+
 test('validates a structured goblin decision and strips hidden reasoning fields', () => {
 	const decision = validateGoblinDecision(
 		{
@@ -175,6 +194,22 @@ test('validates a structured goblin decision and strips hidden reasoning fields'
 	})
 	assert.strictEqual(Object.prototype.hasOwnProperty.call(decision, 'chain_of_thought'), false)
 	assert.strictEqual(GOBLIN_DECISION_SCHEMA.name, 'goblin_decision')
+})
+
+test('validates classic roguelike verbs for autonomous Chatty decisions', () => {
+	;['examine', 'climb', 'pickup', 'equip', 'use', 'fire', 'rest', 'flee', 'reposition'].forEach(action => {
+		const decision = validateGoblinDecision(
+			{
+				action,
+				target: { name: 'classic target' },
+				public_rationale: 'Chatty is playing the classic roguelike verb set.',
+				goblin_utterance: 'Old game verb, new goblin feet.',
+				memory_update: 'Classic verb accepted.'
+			},
+			DEFAULT_GOBLIN_ACTIONS
+		)
+		assert.strictEqual(decision.action, action)
+	})
 })
 
 test('validates core character sprite manifest and generated sheets', () => {
@@ -272,6 +307,8 @@ test('applies legal movement, records public rationale, and preserves event orde
 		animation: 'walk',
 		movementState: 'traveling'
 	})
+	assert.strictEqual(snapshot.events[0].worldDelta.runtime.mode, 'classic-autonomous')
+	assert.strictEqual(snapshot.events[0].worldDelta.runtime.currentMapId, snapshot.map.id)
 	assert.deepStrictEqual(snapshot.memory, ['East is walkable.'])
 	assert.strictEqual(snapshot.events.length, 1)
 })
@@ -1248,13 +1285,40 @@ test('absurd persisted continuation days migrate back to the active day two arc'
 	assert.strictEqual(story.exploration.arcVisitKey, `${story.day}:${story.arcId}:${story.arcStartedTurn}`)
 })
 
+test('continuation campaign rotates through authored arcs before repeating', () => {
+	const sequence = getCampaignArcSequence()
+	const ids = sequence.map(arc => arc.id)
+	const titles = sequence.map(arc => arc.title)
+
+	assert.ok(sequence.length >= 9)
+	assert.strictEqual(new Set(ids).size, ids.length)
+	assert.strictEqual(new Set(titles).size, titles.length)
+	assert.ok(sequence.some(arc => arc.tasks.some(task => task.target && task.target.mapId === 'orcCastle')))
+	assert.ok(sequence.some(arc => arc.tasks.some(task => task.target && task.target.mapId === 'lichBoss')))
+
+	let currentArcId = 'day-2-road-to-freedom'
+	const visited = [currentArcId]
+	for (let index = 1; index < sequence.length; index += 1) {
+		currentArcId = getNextContinuationArcId(currentArcId, visited)
+		assert.strictEqual(visited.includes(currentArcId), false)
+		visited.push(currentArcId)
+	}
+
+	assert.strictEqual(new Set(visited).size, sequence.length)
+	assert.strictEqual(getNextContinuationArcId(visited[visited.length - 1], visited), sequence[0].id)
+})
+
 test('live map registry loads registered maps and existing portal links', () => {
 	const ids = getRegisteredMapIds()
-	assert.ok(ids.includes('mulberryTown'))
-	assert.ok(ids.includes('mulberryForest'))
-	assert.ok(ids.includes('mulberryGraveyard'))
-	assert.ok(ids.includes('lichLair'))
-	assert.ok(ids.includes('lootGoblinLair'))
+	assert.deepStrictEqual(ids, CANONICAL_CLASSIC_MAP_IDS)
+	assert.strictEqual(ids.includes('oldForest'), false)
+	assert.strictEqual(ids.includes('oldGraveyard'), false)
+	assert.strictEqual(ids.includes('oldlichBoss'), false)
+	assert.ok(ids.includes('kingdom'))
+	assert.ok(ids.includes('orcCastle'))
+	assert.ok(ids.includes('overworld'))
+	assert.ok(ids.includes('taintedForest'))
+	assert.ok(ids.includes('lichBoss'))
 	assert.strictEqual(getMapIdForPortal('Mulberry Forest'), 'mulberryForest')
 	assert.strictEqual(getMapIdForPortal('Lich Lair'), 'lichLair')
 
@@ -1262,6 +1326,211 @@ test('live map registry loads registered maps and existing portal links', () => 
 	const links = getPortalLinksForTiledMap(town, 'mulberryTown')
 	assert.ok(links.some(link => link.portalId === 'Mulberry Forest' && link.targetMapId === 'mulberryForest'))
 	assert.ok(links.some(link => link.portalId === 'Mulberry Graveyard' && link.targetMapId === 'mulberryGraveyard'))
+})
+
+test('classic runtime loads every canonical map and resolves every campaign portal', () => {
+	const runtime = createClassicGameRuntime({ staticRoot: path.join(__dirname, '..') })
+	const ids = runtime.getAvailableMapIds()
+
+	assert.deepStrictEqual(ids, CANONICAL_CLASSIC_MAP_IDS)
+	ids.forEach(mapId => {
+		const map = runtime.loadMap(mapId)
+		assert.strictEqual(map.id, mapId)
+		assert.ok(map.width > 0)
+		assert.ok(map.height > 0)
+		runtime.getPortalLinks(mapId).forEach(link => {
+			assert.ok(ids.includes(link.targetMapId), `${mapId} portal ${link.portalId} points outside canonical maps`)
+		})
+	})
+
+	const townToCastle = runtime.findMapRoute('mulberryTown', 'orcCastle')
+	assert.strictEqual(townToCastle[0], 'mulberryTown')
+	assert.strictEqual(townToCastle[townToCastle.length - 1], 'orcCastle')
+	assert.ok(townToCastle.length >= 5)
+})
+
+test('classic runtime snapshot exposes roguelike verbs and safe public state', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			id: 'mulberryTown',
+			name: 'Mulberry Town',
+			width: 12,
+			height: 12,
+			blocked: [],
+			actors: [
+				{ id: 'npc-bartender', name: 'Bartender', entityType: 'NPC', dialog: 'BARTENDER', x: 3, y: 2, spriteId: 2480 },
+				{ id: 'hostile-rat', name: 'Cellar Rat', entityType: 'HOSTILE', x: 4, y: 2, spriteId: 1234 }
+			]
+		},
+		goblin: { x: 2, y: 2 }
+	}))
+	const runtime = getClassicRuntimeSnapshot(world.getSnapshot())
+
+	assert.strictEqual(runtime.mode, 'classic-autonomous')
+	assert.strictEqual(runtime.currentMapId, 'mulberryTown')
+	assert.deepStrictEqual(runtime.availableMapIds, CANONICAL_CLASSIC_MAP_IDS)
+	;['move', 'examine', 'interact', 'climb', 'pickup', 'equip', 'use', 'cast', 'fire', 'attack', 'rest', 'flee'].forEach(action => {
+		assert.ok(runtime.legalActions.includes(action), `${action} should be available to Chatty`)
+	})
+	assert.ok(runtime.inventorySummary.some(item => item.name === 'Bronze Sword'))
+	assert.ok(runtime.inventorySummary.some(item => item.name === 'Minor Heal'))
+	assert.strictEqual(runtime.nearbyNpcs[0].name, 'Bartender')
+	assert.strictEqual(runtime.nearbyEnemies[0].name, 'Cellar Rat')
+	assert.strictEqual(JSON.stringify(runtime).includes('memory'), false)
+	assert.strictEqual(JSON.stringify(runtime).includes('api'), false)
+})
+
+test('classic runtime creates serializable player, item, actor, and portal state from the live world', () => {
+	const world = new GoblinWorld(createWorldFromTiledMap(loadRegisteredTiledMap(path.join(__dirname, '..'), 'mulberryForest'), {
+		staticRoot: path.join(__dirname, '..'),
+		mapId: 'mulberryForest'
+	}))
+	const classic = createClassicStateFromWorld(world.getSnapshot(), { staticRoot: path.join(__dirname, '..') })
+
+	assert.strictEqual(classic.mode, 'classic-autonomous')
+	assert.strictEqual(classic.currentMapId, 'mulberryForest')
+	assert.ok(classic.player.hp > 0)
+	assert.ok(classic.player.maxHp >= classic.player.hp)
+	assert.ok(classic.player.inventory.some(item => item.type === 'HEALTH_POTION'))
+	assert.ok(classic.player.spellbook.some(spell => spell.action === 'cast'))
+	assert.ok(classic.maps.mulberryForest.portals.some(portal => portal.targetMapId === 'overworld' || portal.targetMapId === 'mulberryTown'))
+	assert.ok(Object.values(classic.actors).some(actor => actor.hostile && actor.spriteKey === null && Number.isInteger(actor.spriteId)))
+	assert.strictEqual(JSON.stringify(classic).includes('function'), false)
+})
+
+test('classic runtime applies pickup, equip, use, attack, cast, fire, rest, and flee actions to real state', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			id: 'classicTestMap',
+			name: 'Classic Test Map',
+			width: 8,
+			height: 8,
+			blocked: [],
+			portalLinks: [],
+			actors: [
+				{ id: 'item-sword', name: 'Bronze Sword', entityType: 'SWORD', x: 2, y: 2, spriteId: 35 },
+				{ id: 'item-potion', name: 'Health Potion', entityType: 'HEALTH_POTION', x: 2, y: 2, spriteId: 488 },
+				{ id: 'item-arrow', name: 'Steel Arrow', entityType: 'STEEL_ARROW', x: 2, y: 2, spriteId: 784 },
+				{ id: 'hostile-rat', name: 'Cellar Rat', entityType: 'RAT', x: 3, y: 2, spriteId: 2365 }
+			]
+		},
+		goblin: { x: 2, y: 2 }
+	}))
+	const snapshot = world.getSnapshot()
+	let classic = createClassicStateFromWorld(snapshot, { staticRoot: path.join(__dirname, '..') })
+	classic.player.hp = 5
+	classic.player.mana = 10
+
+	let result = applyClassicAction(classic, snapshot, { action: 'pickup', target: {} }, { seed: 7 })
+	classic = result.state
+	assert.ok(classic.player.inventory.some(item => item.id === 'item-sword'))
+	assert.ok(classic.player.inventory.some(item => item.id === 'item-potion'))
+	assert.strictEqual(result.worldDelta.items.removed.includes('item-sword'), true)
+
+	result = applyClassicAction(classic, snapshot, { action: 'equip', target: { id: 'item-sword' } }, { seed: 7 })
+	classic = result.state
+	assert.strictEqual(classic.player.equipment.weapon.id, 'item-sword')
+
+	result = applyClassicAction(classic, snapshot, { action: 'use', target: { type: 'HEALTH_POTION' } }, { seed: 7 })
+	classic = result.state
+	assert.ok(classic.player.hp > 5)
+	assert.strictEqual(classic.player.inventory.some(item => item.id === 'item-potion'), false)
+
+	result = applyClassicAction(classic, snapshot, { action: 'attack', target: { id: 'hostile-rat' } }, { seed: 7 })
+	classic = result.state
+	assert.ok(classic.actors['hostile-rat'].hp < classic.actors['hostile-rat'].maxHp)
+	assert.ok(result.worldDelta.combat.damage > 0)
+
+	result = applyClassicAction(classic, snapshot, { action: 'cast', target: { id: 'hostile-rat', spell: 'Magic Dart' } }, { seed: 7 })
+	classic = result.state
+	assert.ok(classic.player.mana < 10)
+
+	result = applyClassicAction(classic, snapshot, { action: 'fire', target: { id: 'hostile-rat' } }, { seed: 7 })
+	classic = result.state
+	assert.ok(result.eventPatch.message.includes('arrow') || result.eventPatch.message.includes('bow'))
+
+	const beforeRestHp = classic.player.hp
+	result = applyClassicAction(classic, snapshot, { action: 'rest', target: {} }, { seed: 7 })
+	classic = result.state
+	assert.ok(classic.player.hp >= beforeRestHp)
+
+	result = applyClassicAction(classic, snapshot, { action: 'flee', target: { id: 'hostile-rat' } }, { seed: 7 })
+	assert.strictEqual(result.eventPatch.action, 'flee')
+	assert.ok(result.worldDelta.chatty.position)
+})
+
+test('classic runtime opens chests and doors, and uses portal transitions without changing hostile sprites', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			id: 'classicObjectMap',
+			name: 'Classic Object Map',
+			width: 8,
+			height: 8,
+			blocked: [{ x: 3, y: 2 }],
+			portalLinks: [{ id: 'portal-test', portalId: 'Mulberry Forest', targetMapId: 'mulberryForest', x: 2, y: 3, kind: 'level_transition' }],
+			actors: [
+				{ id: 'door-1', name: 'Door', entityType: 'DOOR', x: 3, y: 2, spriteId: 98 },
+				{ id: 'chest-1', name: 'Chest', entityType: 'CHEST', x: 2, y: 2, spriteId: 552 },
+				{ id: 'hostile-orc', name: 'Orc', entityType: 'ORC', x: 5, y: 2, spriteId: 5292 }
+			]
+		},
+		goblin: { x: 2, y: 2 }
+	}))
+	const snapshot = world.getSnapshot()
+	let classic = createClassicStateFromWorld(snapshot, { staticRoot: path.join(__dirname, '..') })
+
+	let result = applyClassicAction(classic, snapshot, { action: 'interact', target: { id: 'chest-1' } }, { seed: 4 })
+	classic = result.state
+	assert.strictEqual(classic.objects['chest-1'].open, true)
+	assert.ok(classic.player.inventory.some(item => item.source === 'chest-1'))
+
+	result = applyClassicAction(classic, snapshot, { action: 'interact', target: { id: 'door-1' } }, { seed: 4 })
+	classic = result.state
+	assert.strictEqual(classic.objects['door-1'].open, true)
+	assert.strictEqual(result.worldDelta.actors['door-1'].blocked, false)
+
+	result = applyClassicAction(classic, snapshot, { action: 'climb', target: { portalId: 'Mulberry Forest' } }, { seed: 4 })
+	assert.strictEqual(result.transition.targetMapId, 'mulberryForest')
+	assert.strictEqual(classic.actors['hostile-orc'].spriteKey, null)
+	assert.strictEqual(classic.actors['hostile-orc'].spriteId, 5292)
+})
+
+test('classic hostile turns damage adjacent Chatty or move visible hostiles toward him', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			id: 'classicHostileMap',
+			name: 'Classic Hostile Map',
+			width: 8,
+			height: 8,
+			blocked: [],
+			actors: [
+				{ id: 'hostile-rat', name: 'Cellar Rat', entityType: 'RAT', x: 3, y: 2, spriteId: 2365 },
+				{ id: 'hostile-orc', name: 'Orc', entityType: 'ORC', x: 6, y: 2, spriteId: 5292 }
+			]
+		},
+		goblin: { x: 2, y: 2 }
+	}))
+	const snapshot = world.getSnapshot()
+	let classic = createClassicStateFromWorld(snapshot, { staticRoot: path.join(__dirname, '..') })
+	const startingHp = classic.player.hp
+
+	const result = applyClassicAction(classic, snapshot, { action: 'rest', target: {} }, { seed: 9 })
+	classic = result.state
+
+	assert.ok(classic.player.hp < startingHp || result.worldDelta.combat.incomingDamage > 0)
+	assert.ok(classic.actors['hostile-orc'].x < 6, 'visible orc should step toward Chatty')
+	assert.strictEqual(classic.actors['hostile-orc'].spriteKey, null)
+})
+
+test('Railway Docker image builds frontend from source instead of stale railway_dist', () => {
+	const dockerfile = fs.readFileSync(path.join(__dirname, '..', 'Dockerfile'), 'utf8')
+	const dockerignore = fs.readFileSync(path.join(__dirname, '..', '.dockerignore'), 'utf8')
+
+	assert.match(dockerfile, /npm\s+run\s+build/)
+	assert.match(dockerfile, /COPY\s+--from=frontend-build\s+\/app\/dist\s+\.\/dist/)
+	assert.doesNotMatch(dockerfile, /COPY\s+railway_dist\s+\.\/dist/)
+	assert.match(dockerignore, /^dist\/$/m)
+	assert.match(dockerignore, /^railway_dist\/$/m)
 })
 
 test('director plan tracks current intent and recovers when position repeats', () => {
@@ -2288,6 +2557,7 @@ test('serves a shared live state snapshot without exposing server secrets', asyn
 	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 3 } }))
 	const app = createGoblinWorldApp({ world, startLoop: false, loop: { apiKey: '' } })
 	const server = app.listen(0)
+	await waitForListening(server)
 
 	try {
 		const { port } = server.address()
@@ -2322,6 +2592,13 @@ test('serves a shared live state snapshot without exposing server secrets', asyn
 		assert.strictEqual(Object.prototype.hasOwnProperty.call(snapshot.controller.plan, 'targetMapId'), true)
 		assert.strictEqual(snapshot.controller.plan.currentIntent, snapshot.story.directorPlan.currentIntent)
 		assert.strictEqual(snapshot.controller.budget.requestCount, 0)
+		assert.strictEqual(snapshot.runtime.mode, 'classic-autonomous')
+		assert.strictEqual(snapshot.runtime.currentMapId, snapshot.map.id)
+		assert.deepStrictEqual(snapshot.runtime.availableMapIds, CANONICAL_CLASSIC_MAP_IDS)
+		assert.ok(snapshot.runtime.legalActions.includes('fire'))
+		assert.ok(Array.isArray(snapshot.runtime.inventorySummary))
+		assert.ok(Array.isArray(snapshot.runtime.nearbyEnemies))
+		assert.ok(Array.isArray(snapshot.runtime.nearbyNpcs))
 		assert.strictEqual(JSON.stringify(snapshot).includes('OPENAI_API_KEY'), false)
 		assert.strictEqual(JSON.stringify(snapshot).includes('ANTHROPIC_API_KEY'), false)
 	} finally {
@@ -2333,6 +2610,7 @@ test('serves a safe live health status without secrets or memory', async () => {
 	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 3 }, turn: 9 }))
 	const app = createGoblinWorldApp({ world, startLoop: false, persistence: false, loop: { apiKey: '' } })
 	const server = app.listen(0)
+	await waitForListening(server)
 
 	try {
 		const { port } = server.address()
@@ -2370,6 +2648,7 @@ test('admin reset is token guarded and replaces the shared live world', async ()
 		loop: { apiKey: '' }
 	})
 	const server = app.listen(0)
+	await waitForListening(server)
 
 	try {
 		const { port } = server.address()
@@ -4389,6 +4668,20 @@ test('persists snapshots and appends live events as JSONL', () => {
 	assert.deepStrictEqual(restored.goblin.position, { x: 1, y: 1 })
 	assert.strictEqual(restored.memory[0], 'Stillness can be strategy.')
 	assert.strictEqual(JSON.parse(jsonl[0]).message, 'I become furniture.')
+})
+
+test('persistence compacts oversized event logs while preserving newest events', () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'goblinworld-compact-'))
+	const persistence = createWorldPersistence(dir, { maxEventLogLines: 3 })
+
+	for (let id = 1; id <= 8; id += 1) {
+		persistence.appendEvent({ id, message: `event-${id}` })
+	}
+
+	const lines = fs.readFileSync(persistence.paths.eventsPath, 'utf8').trim().split('\n')
+	const ids = lines.map(line => JSON.parse(line).id)
+
+	assert.deepStrictEqual(ids, [6, 7, 8])
 })
 
 test('persistence ignores corrupt snapshots and preserves a backup copy', () => {

@@ -55,6 +55,48 @@ const STORY_ZONES = {
 		centerRatio: { x: 0.66, y: 0.75 },
 		radius: 8
 	},
+	graveyard: {
+		label: 'Graveyard',
+		aliases: ['graveyard', 'grave', 'stone', 'buried names'],
+		centerRatio: { x: 0.48, y: 0.5 },
+		radius: 999
+	},
+	'tainted-forest': {
+		label: 'Tainted Forest',
+		aliases: ['tainted forest', 'blackroot', 'corruption'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
+	'loot-lair': {
+		label: 'Loot Goblin Lair',
+		aliases: ['loot goblin', 'lair', 'supply cache'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
+	'orc-castle': {
+		label: 'Orc Castle',
+		aliases: ['orc castle', 'castle', 'patrol'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
+	'kingdom-road': {
+		label: 'Kingdom Road',
+		aliases: ['kingdom', 'permit', 'clean boots'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
+	'lich-boss': {
+		label: 'Lich Boss Chamber',
+		aliases: ['lich boss', 'bone clerk', 'boss chamber'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
+	'overworld-road': {
+		label: 'Overworld Road',
+		aliases: ['overworld', 'charter road', 'free road'],
+		centerRatio: { x: 0.5, y: 0.5 },
+		radius: 999
+	},
 	mulberry: {
 		label: 'Mulberry',
 		aliases: ['mulberry', 'town'],

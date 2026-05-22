@@ -1,16 +1,31 @@
+FROM node:20.20.2-bookworm-slim AS frontend-build
+
+WORKDIR /app
+ENV NODE_ENV=development
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY babel.config.js ./
+COPY public ./public
+COPY src ./src
+
+RUN npm run build
+
 FROM node:20.20.2-bookworm-slim
 
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN npm init -y >/dev/null 2>&1 \
-	&& npm install express@4.16.3 --omit=dev --no-audit --no-fund
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund \
+	&& npm cache clean --force
 
 COPY server.js ./server.js
 COPY server ./server
 COPY public/maps ./public/maps
 COPY legacy ./legacy
-COPY railway_dist ./dist
+COPY --from=frontend-build /app/dist ./dist
 
 EXPOSE 5000
 

@@ -232,6 +232,8 @@ function normalizeStoryState(input = {}, turn = 0) {
 		encounters,
 		combatBoard,
 		callbacks: unique(Array.isArray(input.callbacks) ? input.callbacks : []),
+		completedArcIds: unique(Array.isArray(input.completedArcIds) ? input.completedArcIds : [])
+			.filter(id => !staleContinuationSave || !String(id).startsWith('day-')),
 		completedTasks,
 		failedTasks,
 		scene,
@@ -368,6 +370,7 @@ function getStorySnapshot(storyInput, turn = 0) {
 		activeTasks: tasks.filter(task => task.status !== 'done' && task.status !== 'failed'),
 		completedTasks: story.completedTasks.slice(),
 		failedTasks: story.failedTasks.slice(),
+		completedArcIds: story.completedArcIds.slice(),
 		callbacks: story.callbacks.slice()
 	}
 }

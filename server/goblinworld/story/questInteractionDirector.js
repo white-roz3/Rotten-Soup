@@ -1,8 +1,8 @@
 const { setUnlock, uniquePush } = require('./taskRules')
 
 const ACTIONS_BY_KIND = {
-	inspect: new Set(['inspect']),
-	item: new Set(['pick_up', 'interact']),
+	inspect: new Set(['inspect', 'examine']),
+	item: new Set(['pick_up', 'pickup', 'interact']),
 	place: new Set(['interact', 'inspect']),
 	route: new Set(['interact', 'inspect']),
 	escort: new Set(['interact', 'wait']),
@@ -13,7 +13,8 @@ const ACTIONS_BY_KIND = {
 	ideology: new Set(['interact', 'wait']),
 	rumor: new Set(['interact', 'wait']),
 	dialogue: new Set(['interact', 'wait']),
-	self: new Set(['move', 'wait', 'inspect'])
+	combat: new Set(['attack', 'cast', 'fire', 'interact', 'inspect', 'examine']),
+	self: new Set(['move', 'wait', 'inspect', 'examine', 'rest'])
 }
 
 function clone(value) {

@@ -3,6 +3,19 @@ const path = require('path')
 
 const DEFAULT_STATIC_ROOT = path.join(__dirname, '..', '..')
 
+const CANONICAL_MAP_IDS = [
+	'mulberryTown',
+	'mulberryForest',
+	'mulberryGraveyard',
+	'lichLair',
+	'lootGoblinLair',
+	'overworld',
+	'kingdom',
+	'orcCastle',
+	'taintedForest',
+	'lichBoss'
+]
+
 const REGISTERED_MAPS = {
 	mulberryTown: {
 		id: 'mulberryTown',
@@ -33,7 +46,69 @@ const REGISTERED_MAPS = {
 		label: 'Loot Goblin Lair',
 		file: 'lootGoblinLair.json',
 		portalIds: ['Mulberry Dungeon', 'Forest Dungeon', 'Loot Goblin Lair']
+	},
+	overworld: {
+		id: 'overworld',
+		label: 'Overworld',
+		file: 'overworld.json',
+		portalIds: ['Overworld']
+	},
+	kingdom: {
+		id: 'kingdom',
+		label: 'Kingdom',
+		file: 'kingdom.json',
+		portalIds: ['Kingdom']
+	},
+	orcCastle: {
+		id: 'orcCastle',
+		label: 'Orc Castle',
+		file: 'orcCastle.json',
+		portalIds: ['Orc Castle']
+	},
+	taintedForest: {
+		id: 'taintedForest',
+		label: 'Tainted Forest',
+		file: 'taintedForest.json',
+		portalIds: ['Tainted Forest']
+	},
+	lichBoss: {
+		id: 'lichBoss',
+		label: 'Lich Boss',
+		file: 'lichBoss.json',
+		portalIds: ['Lich Boss']
 	}
+}
+
+const AUTHORED_PORTAL_LINKS = {
+	mulberryForest: [
+		{ portalId: 'Overworld', targetMapId: 'overworld', ratio: { x: 0.98, y: 0.5 }, direction: 'east' }
+	],
+	lootGoblinLair: [
+		{ portalId: 'Mulberry Forest', targetMapId: 'mulberryForest', ratio: { x: 0.08, y: 0.5 }, direction: 'up' }
+	],
+	overworld: [
+		{ portalId: 'Mulberry Forest', targetMapId: 'mulberryForest', ratio: { x: 0.08, y: 0.45 }, direction: 'west' },
+		{ portalId: 'Kingdom', targetMapId: 'kingdom', ratio: { x: 0.52, y: 0.32 }, direction: 'north' },
+		{ portalId: 'Tainted Forest', targetMapId: 'taintedForest', ratio: { x: 0.78, y: 0.58 }, direction: 'east' }
+	],
+	kingdom: [
+		{ portalId: 'Overworld', targetMapId: 'overworld', ratio: { x: 0.2, y: 0.92 }, direction: 'south' },
+		{ portalId: 'Orc Castle', targetMapId: 'orcCastle', ratio: { x: 0.86, y: 0.18 }, direction: 'east' }
+	],
+	orcCastle: [
+		{ portalId: 'Kingdom', targetMapId: 'kingdom', ratio: { x: 0.08, y: 0.5 }, direction: 'west' }
+	],
+	taintedForest: [
+		{ portalId: 'Overworld', targetMapId: 'overworld', ratio: { x: 0.12, y: 0.5 }, direction: 'west' },
+		{ portalId: 'Lich Boss', targetMapId: 'lichBoss', ratio: { x: 0.82, y: 0.22 }, direction: 'down' }
+	],
+	lichLair: [
+		{ portalId: 'Lich Boss', targetMapId: 'lichBoss', ratio: { x: 0.5, y: 0.08 }, direction: 'down' }
+	],
+	lichBoss: [
+		{ portalId: 'Lich Lair', targetMapId: 'lichLair', ratio: { x: 0.5, y: 0.92 }, direction: 'up' },
+		{ portalId: 'Tainted Forest', targetMapId: 'taintedForest', ratio: { x: 0.18, y: 0.5 }, direction: 'west' }
+	]
 }
 
 const PORTAL_TARGETS = Object.values(REGISTERED_MAPS).reduce((targets, map) => {
@@ -44,7 +119,7 @@ const PORTAL_TARGETS = Object.values(REGISTERED_MAPS).reduce((targets, map) => {
 }, {})
 
 function getRegisteredMapIds() {
-	return Object.keys(REGISTERED_MAPS)
+	return CANONICAL_MAP_IDS.slice()
 }
 
 function getRegisteredMap(mapId = 'mulberryTown') {
@@ -79,6 +154,15 @@ function objectTilePosition(object = {}) {
 	}
 }
 
+function ratioTilePosition(tiledMap = {}, ratio = {}) {
+	const width = Math.max(1, tiledMap.width || 1)
+	const height = Math.max(1, tiledMap.height || 1)
+	return {
+		x: Math.max(0, Math.min(width - 1, Math.floor(width * (Number.isFinite(ratio.x) ? ratio.x : 0.5)))),
+		y: Math.max(0, Math.min(height - 1, Math.floor(height * (Number.isFinite(ratio.y) ? ratio.y : 0.5))))
+	}
+}
+
 function isPortalObject(object = {}) {
 	const properties = getObjectProperties(object)
 	const entityType = String(properties.entity_type || object.type || '').toUpperCase()
@@ -87,8 +171,7 @@ function isPortalObject(object = {}) {
 
 function getPortalLinksForTiledMap(tiledMap = {}, mapId = 'mulberryTown') {
 	const actorLayer = (tiledMap.layers || []).find(layer => layer.type === 'objectgroup' && layer.name === 'Actors')
-	if (!actorLayer) return []
-	return (actorLayer.objects || [])
+	const tiledLinks = actorLayer ? (actorLayer.objects || [])
 		.filter(isPortalObject)
 		.map(object => {
 			const properties = getObjectProperties(object)
@@ -106,8 +189,30 @@ function getPortalLinksForTiledMap(tiledMap = {}, mapId = 'mulberryTown') {
 				x: position.x,
 				y: position.y
 			}
-		})
-		.filter(link => link.targetMapId && link.targetMapId !== mapId)
+			})
+			.filter(link => link.targetMapId && link.targetMapId !== mapId) : []
+	const authoredLinks = (AUTHORED_PORTAL_LINKS[mapId] || []).map((link, index) => {
+		const position = ratioTilePosition(tiledMap, link.ratio)
+		return {
+			id: `authored-portal-${mapId}-${index}`,
+			name: link.name || link.portalId,
+			portalId: link.portalId,
+			sourceMapId: mapId,
+			targetMapId: link.targetMapId,
+			kind: 'authored',
+			direction: link.direction || '',
+			x: position.x,
+			y: position.y,
+			authored: true
+		}
+	})
+	const seen = new Set()
+	return tiledLinks.concat(authoredLinks).filter(link => {
+		const key = `${link.portalId}:${link.targetMapId}`
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	})
 }
 
 function getReciprocalPortal(tiledMap = {}, mapId = 'mulberryTown', sourceMapId = '') {
@@ -115,6 +220,7 @@ function getReciprocalPortal(tiledMap = {}, mapId = 'mulberryTown', sourceMapId 
 }
 
 module.exports = {
+	CANONICAL_MAP_IDS,
 	REGISTERED_MAPS,
 	getMapIdForPortal,
 	getPortalLinksForTiledMap,

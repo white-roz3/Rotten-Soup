@@ -53,8 +53,7 @@ const PUBLIC_CHARACTER_SPEAKERS = new Set([
 	'Hidden Goblin',
 	'Hidden Goblin Pip',
 	'Hidden Goblin Muck',
-	'Hidden Goblin Nib',
-	'Villager'
+	'Hidden Goblin Nib'
 ])
 
 const SYSTEM_FEED_SPEAKERS = new Set([
@@ -64,6 +63,7 @@ const SYSTEM_FEED_SPEAKERS = new Set([
 	'Narrator',
 	'Scene',
 	'Story',
+	'Battle',
 	'System'
 ])
 
@@ -82,21 +82,17 @@ const SYSTEM_FEED_SPEAKERS_NORMALIZED = new Set(
 
 function visibleSpeaker(actor, event = {}) {
 	if (actor === CHATTY_NAME) return 'Chatty'
-	if (event.type === 'scene' || event.type === 'phase' || event.type === 'discovery') return 'Narrator'
-	if (event.type === 'quest') return 'Narrator'
-	if (event.type === 'combat') {
-		return actor && actor !== 'GoblinWorld' && !ENEMY_SPEAKERS.has(actor) ? actor : 'Battle'
-	}
-	if (!actor || actor === 'NPC') return 'Villager'
-	if (actor === 'GoblinWorld') return 'Narrator'
+	// Feed is strictly character voices only. System/meta speakers never become a narrator voice.
+	if (!actor || actor === 'NPC') return ''
+	if (actor === 'GoblinWorld') return ''
 	return actor
 }
 
 function cleanFeedSpeaker(speaker, event = {}) {
 	const raw = String(speaker || '').trim()
-	if (!raw || SYSTEM_FEED_SPEAKERS_NORMALIZED.has(raw.toLowerCase())) return visibleSpeaker(event.actor, event)
-	if (event.type === 'combat' && ENEMY_SPEAKERS.has(raw)) return 'Battle'
-	if (raw === 'NPC') return 'Villager'
+	if (!raw) return visibleSpeaker(event.actor, event)
+	if (SYSTEM_FEED_SPEAKERS_NORMALIZED.has(raw.toLowerCase())) return ''
+	if (raw === 'NPC') return ''
 	return raw
 }
 
@@ -144,7 +140,8 @@ function sanitizeText(message, event = {}) {
 }
 
 function isBlockedFeedText(text) {
-	return /next lead|route recovery|objective changed|controller|validation|raw prompt|api key|story clue|story is speaking|piece of the story|current story|story beat|stay put and listen|sky-thought|feet choose anyway|wanders|villager move|npc\s*\/\s*move/i.test(String(text || ''))
+	return /next lead|route recovery|objective changed|controller|validation|raw prompt|api key|story clue|story is speaking|piece of the story|current story|story beat|stay put and listen|sky-thought|feet choose anyway|roads after dawn|^day\\s+\\d+\\s*:/i.test(String(text || '')) ||
+		/wanders|villager move|npc\s*\/\s*move/i.test(String(text || ''))
 }
 
 function createChattyFeedNarration(event = {}) {

@@ -808,10 +808,8 @@ export default {
 			const messageSpeaker = this.feedMessageSpeaker(event)
 			if (messageSpeaker) return messageSpeaker
 			if (event.actor === this.goblinNameLabel) return 'Chatty'
-			if (event.type === 'scene' || event.type === 'phase' || event.type === 'discovery') return 'Narrator'
-			if (event.type === 'quest') return 'Narrator'
-			if (event.type === 'combat') return 'Battle'
-			if (event.actor === 'GoblinWorld') return 'Narrator'
+			// The public feed is character voices only.
+			if (event.actor === 'GoblinWorld') return ''
 			return this.displayActorName(event.actor, event)
 		},
 		isAllowedFeedSpeaker(speaker) {
@@ -828,19 +826,15 @@ export default {
 				'Hidden Goblin',
 				'Hidden Goblin Pip',
 				'Hidden Goblin Muck',
-				'Hidden Goblin Nib',
-				'Villager'
+				'Hidden Goblin Nib'
 			].includes(String(speaker || '').trim())
 		},
 		cleanFeedSpeaker(speaker, event = {}) {
 			const raw = String(speaker || '').trim()
-			const systemSpeakers = ['Discovery', 'GoblinWorld', 'Narrator', 'Quest', 'Scene', 'Story', 'System']
+			const systemSpeakers = ['Discovery', 'GoblinWorld', 'Narrator', 'Battle', 'Quest', 'Scene', 'Story', 'System']
 			const isSystemSpeaker = systemSpeakers.some(systemSpeaker => systemSpeaker.toLowerCase() === raw.toLowerCase())
-			if (!raw || isSystemSpeaker) return this.feedSpeaker(event || {})
-			if (event && event.type === 'combat') {
-				const enemySpeakers = ['Cellar Rat', 'Bitey Weed', 'Ledger Mite', 'Bramble Crawler', 'Crown Hound', 'Thorn Scout', 'Pantry Slime', 'Armor Scrap', 'Ledger Warden', 'Crown Remnant']
-				if (enemySpeakers.includes(raw)) return 'Battle'
-			}
+			if (!raw) return this.feedSpeaker(event || {})
+			if (isSystemSpeaker) return ''
 			return raw
 		},
 		cleanFeedText(text, event = {}) {
@@ -853,7 +847,8 @@ export default {
 			const normalized = String(text || '').trim().toLowerCase()
 			const oldListenFallback = normalized === ['i stop', 'and listen'].join(' ') || normalized === ['i stop', 'and listen.'].join(' ')
 			return oldListenFallback ||
-				/next lead|route recovery|objective changed|controller|validation|raw prompt|api key|story clue|story is speaking|piece of the story|current story|story beat|stay put and listen|sky-thought|feet choose anyway|wanders|npc\s*\/\s*move/i.test(String(text || ''))
+				/next lead|route recovery|objective changed|controller|validation|raw prompt|api key|story clue|story is speaking|piece of the story|current story|story beat|stay put and listen|sky-thought|feet choose anyway|roads after dawn|^day\\s+\\d+\\s*:/i.test(String(text || '')) ||
+				/wanders|npc\s*\/\s*move/i.test(String(text || ''))
 		},
 		isSystemFeedEvent(event) {
 			return Boolean(event && ['discovery', 'phase', 'quest', 'scene', 'story', 'system'].includes(String(event.type || '').toLowerCase()))

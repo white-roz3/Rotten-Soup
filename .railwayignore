@@ -8,6 +8,7 @@
 node_modules
 node_modules/
 dist/
+railway_dist/
 npm-debug.log*
 yarn-error.log*
 .DS_Store

@@ -20,7 +20,14 @@ const ZONE_ALIASES = {
 	cellar: ['cellar', 'ledger', 'mite', 'rat'],
 	'forest-edge': ['forest', 'bramble', 'blackroot'],
 	'hidden-camp': ['hidden', 'camp', 'goblin'],
-	'under-road': ['under-road', 'sealed-door', 'binding', 'first goblin name']
+	'under-road': ['under-road', 'sealed-door', 'binding', 'first goblin name'],
+	graveyard: ['graveyard', 'grave', 'stone', 'buried'],
+	'tainted-forest': ['tainted', 'blackroot', 'corruption'],
+	'loot-lair': ['loot', 'lair', 'supply cache'],
+	'orc-castle': ['orc', 'castle', 'patrol'],
+	'kingdom-road': ['kingdom', 'permit', 'politics'],
+	'lich-boss': ['lich boss', 'bone clerk', 'boss chamber'],
+	'overworld-road': ['overworld', 'charter', 'free road']
 }
 
 const ACTOR_ZONE_BY_DIALOG = {
@@ -80,6 +87,34 @@ const STORY_WAYPOINTS = {
 	'under-road': [
 		{ id: 'under-road-entrance', label: 'Under Road Entrance', ratio: { x: 0.66, y: 0.75 } },
 		{ id: 'sealed-door', label: 'Sealed Door', ratio: { x: 0.7, y: 0.76 } }
+	],
+	graveyard: [
+		{ id: 'graveyard-gate', label: 'Graveyard Gate', ratio: { x: 0.5, y: 0.88 } },
+		{ id: 'old-goblin-stones', label: 'Old Goblin Stones', ratio: { x: 0.48, y: 0.5 } }
+	],
+	'tainted-forest': [
+		{ id: 'tainted-tree-line', label: 'Tainted Tree Line', ratio: { x: 0.12, y: 0.5 } },
+		{ id: 'blackroot-mark', label: 'Blackroot Mark', ratio: { x: 0.54, y: 0.46 } }
+	],
+	'loot-lair': [
+		{ id: 'loot-lair-mouth', label: 'Loot Lair Mouth', ratio: { x: 0.1, y: 0.52 } },
+		{ id: 'supply-cache', label: 'Supply Cache', ratio: { x: 0.54, y: 0.45 } }
+	],
+	'orc-castle': [
+		{ id: 'orc-castle-road', label: 'Orc Castle Road', ratio: { x: 0.12, y: 0.5 } },
+		{ id: 'patrol-line', label: 'Patrol Line', ratio: { x: 0.5, y: 0.5 } }
+	],
+	'kingdom-road': [
+		{ id: 'kingdom-road', label: 'Kingdom Road', ratio: { x: 0.5, y: 0.82 } },
+		{ id: 'permit-house', label: 'Permit House', ratio: { x: 0.52, y: 0.48 } }
+	],
+	'lich-boss': [
+		{ id: 'lich-boss-entry', label: 'Lich Boss Entry', ratio: { x: 0.5, y: 0.9 } },
+		{ id: 'bone-ledger', label: 'Bone Ledger', ratio: { x: 0.5, y: 0.45 } }
+	],
+	'overworld-road': [
+		{ id: 'overworld-road', label: 'Overworld Road', ratio: { x: 0.5, y: 0.5 } },
+		{ id: 'charter-crossing', label: 'Charter Crossing', ratio: { x: 0.62, y: 0.5 } }
 	],
 	mulberry: [
 		{ id: 'mulberry-road', label: 'Mulberry Road', ratio: { x: 0.5, y: 0.5 } }

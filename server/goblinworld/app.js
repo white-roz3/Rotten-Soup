@@ -1,6 +1,7 @@
 const express = require('express')
 const path = require('path')
 const { createInitialWorld, createWorldFromTiledMap, GoblinWorld, createEvent } = require('./liveWorld')
+const { getClassicRuntimeSnapshot } = require('./classicRuntime')
 const { getRegisteredMap, loadRegisteredTiledMap } = require('./mapRegistry')
 const { getControllerStatus, startGoblinLoop } = require('./openaiGoblin')
 const { createWorldPersistence } = require('./persistence')
@@ -122,7 +123,8 @@ function createGoblinWorldApp(options = {}) {
 		res.json({
 			...snapshot,
 			model: controller.model,
-			controller
+			controller,
+			runtime: getClassicRuntimeSnapshot(snapshot, { staticRoot })
 		})
 	})
 

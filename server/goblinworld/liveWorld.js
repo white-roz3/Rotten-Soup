@@ -9,6 +9,7 @@ const DEFAULT_NPC_DIALOGUE_COOLDOWN_TURNS = 6
 const DEFAULT_MAX_NPC_MOVES_PER_TURN = 4
 const DEFAULT_MAX_NPC_SPEECH_EVENTS_PER_TURN = 1
 const { getCharacterSpriteForActor } = require('./characterSprites')
+const { getClassicRuntimeSnapshot } = require('./classicRuntime')
 const { createFeedEntryForEvent } = require('./feedNarrator')
 const {
 	getPortalLinksForTiledMap,
@@ -632,7 +633,8 @@ class GoblinWorld {
 		const snapshot = this.getSnapshot()
 		return {
 			story: snapshot.story,
-			tasks: snapshot.tasks
+			tasks: snapshot.tasks,
+			runtime: getClassicRuntimeSnapshot(snapshot)
 		}
 	}
 
@@ -641,7 +643,7 @@ class GoblinWorld {
 	}
 
 	getLegalActions() {
-		return ['move', 'wait', 'interact', 'pick_up', 'attack', 'cast', 'inspect']
+		return ['move', 'wait', 'interact', 'pick_up', 'pickup', 'attack', 'cast', 'inspect', 'examine', 'climb', 'equip', 'use', 'fire', 'rest', 'flee', 'reposition']
 	}
 
 	isBlocked(position) {
