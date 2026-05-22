@@ -993,8 +993,18 @@ class GoblinWorld {
 		}
 
 		if (dialogueRadius > 0 && maxSpeechEvents > 0) {
+			const storySnapshot = this.getSnapshot().story || {}
+			const navigation = storySnapshot.navigation || {}
+			const proxyScriptActorId = nextScriptSpeaker &&
+				navigation.targetActorId &&
+				navigation.routeStatus === 'proxy-reached'
+				? navigation.targetActorId
+				: null
 			const nearbySpeakers = actors
-				.filter(actor => isNpc(actor) && manhattanDistance(actor, this.state.goblin.position) <= dialogueRadius)
+				.filter(actor => isNpc(actor) && (
+					manhattanDistance(actor, this.state.goblin.position) <= dialogueRadius ||
+					(proxyScriptActorId && actor.id === proxyScriptActorId && getActorStoryKey(actor) === nextScriptSpeaker)
+				))
 				.filter(actor => isNpcRelevantToCurrentConversation(actor, activeTask, this.state.story.scene, options, this.state.story))
 				.filter(actor => !Number.isInteger(actor.lastSpeechTurn) || this.state.turn - actor.lastSpeechTurn >= dialogueCooldownTurns)
 				.sort((a, b) => {
