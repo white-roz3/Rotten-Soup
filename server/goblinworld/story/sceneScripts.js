@@ -1,6 +1,7 @@
 const { uniquePush } = require('./taskRules')
 const { STORY_PHASES } = require('./phases')
 const { getCharacter } = require('./characters')
+const { AUTHORED_SCENE_SCRIPTS } = require('./authoredSceneScripts')
 
 const CHATTY_NAME = 'Chatty, the chosen one'
 
@@ -217,6 +218,8 @@ const SCENE_SCRIPTS = {
 		]
 	}
 }
+
+Object.assign(SCENE_SCRIPTS, AUTHORED_SCENE_SCRIPTS)
 
 function getTaskSpeaker(task = {}) {
 	const target = task.target || {}

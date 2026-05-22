@@ -1222,6 +1222,15 @@ test('scene scripts cover every main story quest', () => {
 	assert.strictEqual(coverage.scriptedCount, coverage.taskCount)
 })
 
+test('current story quests use authored scripts instead of generated task blurbs', () => {
+	const taskIds = new Set(STORY_PHASES.flatMap(phase => phase.tasks.map(task => task.id)))
+	const generated = Object.entries(require('../server/goblinworld/story').SCENE_SCRIPTS)
+		.filter(([scriptId, script]) => taskIds.has(scriptId) && script.generated)
+		.map(([scriptId]) => scriptId)
+
+	assert.deepStrictEqual(generated, [])
+})
+
 test('every authored scene beat includes a Chatty reply', () => {
 	const missing = Object.entries(require('../server/goblinworld/story').SCENE_SCRIPTS)
 		.flatMap(([scriptId, script]) => (script.beats || [])
