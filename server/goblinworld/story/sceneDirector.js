@@ -168,13 +168,10 @@ function getTaskMatchingActor(task, context = {}) {
 	const target = task && task.target ? task.target : {}
 	const actors = getNearbyActors(context)
 	let matches = []
-	if (task && task.id === 'phase-1-find-voice') {
-		matches = actors
-	}
-	if (!matches.length && (target.dialog || target.name)) {
+	if (target.dialog || target.name) {
 		matches = actors.filter(actor => targetMatchesActor(target, actor))
 	}
-	if (!matches.length && DIALOGUE_TARGET_KINDS.has(target.kind)) {
+	if (!matches.length && !target.dialog && !target.name && DIALOGUE_TARGET_KINDS.has(target.kind)) {
 		matches = actors
 	}
 	return matches[0] || null

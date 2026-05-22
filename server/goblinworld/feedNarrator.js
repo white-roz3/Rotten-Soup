@@ -195,6 +195,7 @@ function shouldHideEvent(event = {}) {
 	if (event.controller === 'dialogue-hold') return true
 	if (/\[ACTION\]|npc\s*\/\s*move|wanders\s+to|controller\s*=/i.test(`${event.message || ''} ${event.publicRationale || ''}`)) return true
 	if (event.actor !== CHATTY_NAME && event.type === 'action' && event.action === 'move') return true
+	if (event.actor === CHATTY_NAME && event.type === 'action' && event.action === 'interact' && !(event.target && event.target.targetMapId)) return true
 	if (event.controller === 'npc-sim' && event.type === 'action' && event.action === 'move') return true
 	if (event.actor === CHATTY_NAME && event.type === 'action' && event.action === 'move' && isRoutineMovement(event)) return true
 	return false

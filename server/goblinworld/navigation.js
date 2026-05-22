@@ -235,16 +235,13 @@ function getTaskActors(snapshot, task) {
 	const target = (task && task.target) || {}
 	const actors = getDialogueActors(snapshot)
 	let matches = []
-	if (task && task.id === 'phase-1-find-voice') {
-		matches = actors
-	}
-	if (!matches.length && target.dialog) {
+	if (target.dialog) {
 		matches = actors.filter(actor => actor.dialog === target.dialog)
 	}
 	if (!matches.length && target.name) {
 		matches = actors.filter(actor => actorMatchesName(actor, target.name))
 	}
-	if (!matches.length && DIALOGUE_TARGET_KINDS.has(target.kind)) {
+	if (!matches.length && !target.dialog && !target.name && DIALOGUE_TARGET_KINDS.has(target.kind)) {
 		matches = actors
 	}
 	const goblin = snapshot.goblin.position

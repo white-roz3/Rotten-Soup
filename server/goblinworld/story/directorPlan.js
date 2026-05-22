@@ -11,6 +11,15 @@ const RECOVERY_ZONES = [
 	'forest-edge'
 ]
 const MAX_RECOVERY_FAILURES = 3
+const CONVERSATION_TARGET_KINDS = new Set([
+	'dialogue',
+	'rumor',
+	'ally',
+	'speech',
+	'goal',
+	'choice',
+	'ideology'
+])
 
 function clone(value) {
 	return JSON.parse(JSON.stringify(value))
@@ -156,6 +165,11 @@ function createPlanForTask(task, turn = 0, previous = {}) {
 	}, turn)
 }
 
+function isConversationTask(task = {}) {
+	const kind = task.target && task.target.kind
+	return CONVERSATION_TARGET_KINDS.has(kind)
+}
+
 function positionKey(position) {
 	if (!position || !Number.isInteger(position.x) || !Number.isInteger(position.y)) return ''
 	return `${position.x},${position.y}`
@@ -190,15 +204,23 @@ function syncDirectorPlan(story = {}, currentTask = null, context = {}, turn = 0
 	const previous = normalizePlan(story.directorPlan || {}, turn)
 	let plan = previous
 	let changed = false
+	let forcedTaskPlan = false
 	if (!previous.questId && currentTask || currentTask && previous.questId !== currentTask.id) {
 		plan = createPlanForTask(currentTask, turn, previous)
 		changed = true
+		forcedTaskPlan = true
+	} else if (currentTask && isConversationTask(currentTask) && previous.status === 'recovering') {
+		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount })
+		changed = true
+		forcedTaskPlan = true
 	} else if (currentTask && previous.status === 'recovering' && (previous.failureCount || 0) > MAX_RECOVERY_FAILURES) {
 		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: 0, recoveryIndex: 0 })
 		changed = true
+		forcedTaskPlan = true
 	} else if (!currentTask && previous.status === 'idle') {
 		plan = createPlanForTask(null, turn, previous)
 		changed = true
+		forcedTaskPlan = true
 	}
 
 	const key = positionKey(context.goblin && context.goblin.position)
@@ -206,7 +228,10 @@ function syncDirectorPlan(story = {}, currentTask = null, context = {}, turn = 0
 		plan.repeatedPositionTurns = key === previous.lastPositionKey ? previous.repeatedPositionTurns + 1 : 0
 		plan.lastPositionKey = key
 	}
-	if (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn) {
+	if (!forcedTaskPlan && isConversationTask(currentTask) && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
+		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount + 1, recoveryIndex: previous.recoveryIndex })
+		changed = true
+	} else if (!forcedTaskPlan && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
 		plan = recoverPlan(plan, turn)
 		changed = true
 	} else {

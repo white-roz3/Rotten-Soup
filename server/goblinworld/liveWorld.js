@@ -874,7 +874,11 @@ class GoblinWorld {
 		const taskKind = task.target && task.target.kind
 		const scriptContext = getCurrentScriptContext(this.state.story, task, this.state.story.scene)
 		if (gatedKinds.has(taskKind) && hasSceneScript(scriptContext) && !isSceneScriptComplete(this.state.story, scriptContext)) {
-			return { applied: false, eventPatch: null, waitingForConversation: true }
+			return {
+				applied: false,
+				eventPatch: null,
+				waitingForConversation: this.isDecisionAtScriptConversation(decision, task, scriptContext)
+			}
 		}
 		const navigation = this.getSnapshot().story.navigation
 		const result = applyQuestInteraction(this.state.story, task, {
@@ -886,6 +890,22 @@ class GoblinWorld {
 		})
 		this.state.story = result.story
 		return result
+	}
+
+	isDecisionAtScriptConversation(decision = {}, task = {}, scriptContext = {}) {
+		const nextSpeaker = getNextSceneScriptSpeaker(this.state.story, scriptContext)
+		if (!nextSpeaker) return false
+		const actor = this.state.map.actors.find(candidate => isNpc(candidate) && getActorStoryKey(candidate) === nextSpeaker)
+		if (!actor) return false
+		const target = decision.target || {}
+		const distanceToActor = manhattanDistance(this.state.goblin.position, actor)
+		const nearActor = distanceToActor <= DEFAULT_NPC_DIALOGUE_RADIUS
+		const targetMatchesActor = target.id === actor.id ||
+			target.dialog === actor.dialog ||
+			getActorStoryKey(target) === nextSpeaker ||
+			String(target.name || '').toLowerCase() === String(actor.name || '').toLowerCase()
+		const targetClaimsQuest = target.questId === task.id || target.reached === true
+		return nearActor && (decision.action === 'wait' || decision.action === 'interact') && (targetMatchesActor || targetClaimsQuest)
 	}
 
 	getNpcMoveTarget(actor, options = {}) {
@@ -1091,8 +1111,9 @@ class GoblinWorld {
 		return events
 	}
 
-	advanceStory() {
+	advanceStory(options = {}) {
 		const result = advanceStoryProgress(this.state.story, this.state.turn, {
+			requireScriptCompletion: Boolean(options.requireScriptCompletion),
 			recentEvents: this.state.events.slice(-40),
 			goblin: this.state.goblin,
 			map: this.state.map,

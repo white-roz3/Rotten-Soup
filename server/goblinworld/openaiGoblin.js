@@ -488,16 +488,13 @@ function getTaskActors(snapshot, task) {
 	const target = (task && task.target) || {}
 	const actors = getDialogueActors(snapshot)
 	let matches = []
-	if (task && task.id === 'phase-1-find-voice') {
-		matches = actors
-	}
-	if (!matches.length && target.dialog) {
+	if (target.dialog) {
 		matches = actors.filter(actor => actor.dialog === target.dialog)
 	}
 	if (!matches.length && target.name) {
 		matches = actors.filter(actor => actorMatchesName(actor, target.name))
 	}
-	if (!matches.length && ['dialogue', 'rumor', 'ally', 'ideology', 'speech', 'goal', 'choice'].includes(target.kind)) {
+	if (!matches.length && !target.dialog && !target.name && ['dialogue', 'rumor', 'ally', 'ideology', 'speech', 'goal', 'choice'].includes(target.kind)) {
 		matches = actors
 	}
 	const goblin = snapshot.goblin.position
@@ -700,7 +697,8 @@ function fallbackDecision(snapshot, overrides = {}) {
 		: currentTask
 	const route = routeTask ? navigation.resolveQuestNavigation(snapshot, routeTask) : null
 	const routeKind = routeTask && routeTask.target ? routeTask.target.kind : ''
-	const canActAtReachedRoute = route && routeTask && route.reached && routeKind !== 'self'
+	const dialogueRouteNeedsActor = ['dialogue', 'rumor', 'ally', 'ideology', 'speech', 'goal', 'choice'].includes(routeKind)
+	const canActAtReachedRoute = route && routeTask && route.reached && routeKind !== 'self' && !(dialogueRouteNeedsActor && !route.targetActorId)
 	if (canActAtReachedRoute) {
 		const targetName = route.targetActorName || (route.targetPortal && route.targetPortal.portalId) || route.targetZone || routeTask.title || 'the next lead'
 		const routeTarget = routeTask.target || {}
@@ -1052,10 +1050,14 @@ async function tickGoblin(world, options = {}) {
 }
 
 async function tickWorld(world, options = {}) {
-	const openingStoryEvents = typeof world.advanceStory === 'function' ? world.advanceStory(options) : []
+	const storyOptions = {
+		...options,
+		requireScriptCompletion: options.requireScriptCompletion !== false
+	}
+	const openingStoryEvents = typeof world.advanceStory === 'function' ? world.advanceStory(storyOptions) : []
 	const goblinEvent = await tickGoblin(world, options)
 	const npcEvents = typeof world.advanceNpcs === 'function' ? world.advanceNpcs(options) : []
-	const storyEvents = typeof world.advanceStory === 'function' ? world.advanceStory(options) : []
+	const storyEvents = typeof world.advanceStory === 'function' ? world.advanceStory(storyOptions) : []
 	return [...openingStoryEvents, goblinEvent, ...npcEvents, ...storyEvents]
 }
 

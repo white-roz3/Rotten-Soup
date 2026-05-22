@@ -36,6 +36,7 @@ const {
 	getContinuationArc,
 	getStorySnapshot,
 	getExpandedStoryStats,
+	getStoryTasks,
 	getAllNpcSouls,
 	getCompactNpcSoul,
 	getNpcIdentityForActor,
@@ -696,6 +697,23 @@ test('scene director uses dialogue only when a quest voice is nearby', () => {
 	assert.deepStrictEqual(nearby.story.scene.participants, ['chatty', 'actor-165'])
 	assert.strictEqual(far.story.scene.sceneType, 'travel')
 	assert.strictEqual(far.story.scene.questId, 'phase-1-find-voice')
+})
+
+test('scene director does not replace authored quest speaker with a random nearby NPC', () => {
+	const result = advanceStoryProgress({
+		lastPhaseAnnounced: 'phase-1',
+		completedTasks: ['phase-1-test-body']
+	}, 12, {
+		allowAutoProgress: false,
+		goblin: { position: { x: 2, y: 2 } },
+		nearbyActors: [
+			{ id: 'wanderer', name: 'Forest Wanderer', entityType: 'NPC', spriteKey: 'forestWanderer', x: 3, y: 2 }
+		]
+	})
+
+	assert.strictEqual(result.story.scene.sceneType, 'travel')
+	assert.strictEqual(result.story.scene.questId, 'phase-1-find-voice')
+	assert.deepStrictEqual(result.story.scene.participants, ['chatty'])
 })
 
 test('scene events do not duplicate until the active quest changes', () => {
@@ -2508,6 +2526,21 @@ test('feed narrator hides dialogue hold waits because they are internal pacing',
 	assert.strictEqual(event.feed, null)
 })
 
+test('feed narrator hides fallback interact prompts that are not authored dialogue', () => {
+	const event = createEvent({
+		id: 76,
+		turn: 12,
+		type: 'action',
+		actor: 'Chatty, the chosen one',
+		action: 'interact',
+		controller: 'fallback',
+		target: { id: 'bartender', name: 'Bartender' },
+		message: 'Bartender, give me the useful part before my cloak gets dramatic.'
+	}).toJSON()
+
+	assert.strictEqual(event.feed, null)
+})
+
 test('visible feed speakers stay limited to Chatty and named NPCs', () => {
 	const visibleEvents = [
 		createEvent({
@@ -3644,6 +3677,85 @@ test('live story snapshot exposes current quest navigation without raw path spam
 	assert.deepStrictEqual(snapshot.story.navigation.nextStep, { direction: 'east', x: 3, y: 2 })
 	assert.strictEqual(Object.prototype.hasOwnProperty.call(snapshot.story.navigation, 'path'), false)
 	assert.deepStrictEqual(snapshot.story.navigation, navigation)
+})
+
+test('dialogue quest recovery keeps the authored speaker target', () => {
+	const story = normalizeStoryState({
+		lastPhaseAnnounced: 'phase-1',
+		completedTasks: ['phase-1-test-body'],
+		directorPlan: {
+			questId: 'phase-1-find-voice',
+			currentIntent: 'Break the route loop toward Market',
+			targetName: 'Market',
+			targetZone: 'market',
+			status: 'recovering',
+			routeStatus: 'recovering',
+			failureCount: 1,
+			startedTurn: 30,
+			updatedTurn: 34,
+			timeoutTurn: 84
+		}
+	}, 35)
+	const activeTask = getStoryTasks(story).find(task => task.status === 'active')
+	const result = syncDirectorPlan(story, activeTask, {
+		goblin: { position: { x: 7, y: 47 } }
+	}, 35)
+
+	assert.strictEqual(result.plan.questId, 'phase-1-find-voice')
+	assert.strictEqual(result.plan.targetName, 'Bartender')
+	assert.strictEqual(result.plan.targetZone, 'tavern')
+	assert.notStrictEqual(result.plan.currentIntent, 'Break the route loop toward Market')
+	assert.strictEqual(result.plan.status, 'active')
+})
+
+test('navigation keeps find-voice aimed at bartender even when closer wanderers exist', () => {
+	const world = new GoblinWorld(
+		createInitialWorld({
+			map: {
+				name: 'Script Target Town',
+				width: 10,
+				height: 5,
+				tiles: [
+					[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+					[1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+				],
+				blocked: [],
+				actors: [
+					{
+						id: 'wanderer',
+						name: 'Forest Wanderer',
+						entityType: 'NPC',
+						spriteKey: 'forestWanderer',
+						x: 3,
+						y: 2,
+						home: { x: 3, y: 2 },
+						spriteId: 401
+					},
+					{
+						id: 'bartender',
+						name: 'Bartender',
+						entityType: 'NPC',
+						dialog: 'BARTENDER',
+						x: 8,
+						y: 2,
+						home: { x: 8, y: 2 },
+						spriteId: 400
+					}
+				]
+			},
+			goblin: { x: 2, y: 2 },
+			story: {
+				completedTasks: ['phase-1-test-body']
+			}
+		})
+	)
+
+	const snapshot = world.getSnapshot()
+	assert.strictEqual(snapshot.story.navigation.targetActorId, 'bartender')
+	assert.strictEqual(snapshot.story.navigation.targetZone, 'tavern')
 })
 
 test('movement events include refreshed public navigation so the frontend route marker does not lag', () => {

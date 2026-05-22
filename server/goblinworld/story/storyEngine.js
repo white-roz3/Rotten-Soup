@@ -51,12 +51,14 @@ const {
 	recordSceneChange,
 	selectScene
 } = require('./sceneDirector')
+const { hasSceneScript, isSceneScriptComplete } = require('./sceneScripts')
 const { getCompactNpcSoul } = require('./souls')
 const { applyTaskRewards, evaluateTask, setUnlock, uniquePush } = require('./taskRules')
 const { getZoneForPosition } = require('./worldZones')
 
 const MAX_REASONABLE_STORY_DAY = 30
 const CHATTY_NAME = 'Chatty, the chosen one'
+const SCRIPT_GATED_TASK_KINDS = new Set(['dialogue', 'rumor', 'ally', 'speech', 'goal', 'choice', 'ideology'])
 
 function clone(value) {
 	return JSON.parse(JSON.stringify(value))
@@ -64,6 +66,18 @@ function clone(value) {
 
 function unique(values) {
 	return Array.from(new Set((values || []).filter(Boolean)))
+}
+
+function taskNeedsCompletedScript(story, task, context = {}) {
+	if (!context.requireScriptCompletion && context.allowAutoProgress !== false) return false
+	const kind = task && task.target && task.target.kind
+	if (!SCRIPT_GATED_TASK_KINDS.has(kind)) return false
+	const scriptContext = {
+		story,
+		activeTask: task,
+		scene: story.scene
+	}
+	return hasSceneScript(scriptContext) && !isSceneScriptComplete(story, scriptContext)
 }
 
 const TASKS_BY_ID = STORY_PHASES.reduce((lookup, phase) => {
@@ -642,7 +656,8 @@ function advanceStoryProgress(storyInput = {}, turn = 0, context = {}) {
 	for (const task of phase.tasks) {
 		if (story.completedTasks.includes(task.id) || story.failedTasks.includes(task.id)) continue
 		spawnEncounterForTask(story, task, events, context)
-		const result = evaluateTask(story, phase, task, turn, ruleContext)
+		const evaluated = evaluateTask(story, phase, task, turn, ruleContext)
+		const result = taskNeedsCompletedScript(story, task, ruleContext) && evaluated === 'complete' ? 'pending' : evaluated
 		if (result === 'complete') {
 			completeTask(story, phase, task, events, turn)
 			continue
