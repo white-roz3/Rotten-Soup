@@ -344,6 +344,57 @@ test('non-movement decisions publish an idle movement state for the frontend', (
 	assert.strictEqual(world.getSnapshot().goblin.movementState, 'speaking')
 })
 
+test('live decisions apply classic pickup, equipment, and item use to persistent runtime state', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		map: {
+			id: 'classicLiveTest',
+			name: 'Classic Live Test',
+			width: 6,
+			height: 6,
+			blocked: [],
+			actors: [
+				{ id: 'item-sword', name: 'Bronze Sword', entityType: 'SWORD', x: 2, y: 2, spriteId: 35 },
+				{ id: 'item-potion', name: 'Health Potion', entityType: 'HEALTH_POTION', x: 2, y: 2, spriteId: 488 }
+			]
+		},
+		goblin: { x: 2, y: 2 }
+	}))
+
+	world.applyDecision({
+		action: 'pickup',
+		target: {},
+		publicRationale: 'Useful things belong in pockets.',
+		goblinUtterance: '',
+		memoryUpdate: ''
+	})
+	let snapshot = world.getSnapshot()
+	assert.strictEqual(snapshot.map.actors.some(actor => actor.id === 'item-sword'), false)
+	assert.strictEqual(snapshot.runtime.inventorySummary.some(item => item.id === 'item-sword'), true)
+	assert.strictEqual(snapshot.events[0].worldDelta.items.removed.includes('item-sword'), true)
+
+	world.applyDecision({
+		action: 'equip',
+		target: { id: 'item-sword' },
+		publicRationale: 'The blade makes the body less negotiable.',
+		goblinUtterance: '',
+		memoryUpdate: ''
+	})
+	snapshot = world.getSnapshot()
+	assert.strictEqual(snapshot.runtime.equipmentSummary.weapon.id, 'item-sword')
+
+	world.state.classic.player.hp = 5
+	world.applyDecision({
+		action: 'use',
+		target: { id: 'item-potion', type: 'HEALTH_POTION' },
+		publicRationale: 'A chosen body should keep its juice inside.',
+		goblinUtterance: '',
+		memoryUpdate: ''
+	})
+	snapshot = world.getSnapshot()
+	assert.ok(snapshot.runtime.playerStats.hp > 5)
+	assert.strictEqual(snapshot.runtime.inventorySummary.some(item => item.id === 'item-potion'), false)
+})
+
 test('derives public tasks for the live task panel', () => {
 	const world = new GoblinWorld(
 		createInitialWorld({

@@ -539,10 +539,17 @@ function publicActor(actor = {}) {
 function getClassicRuntimeSnapshot(snapshot = {}, options = {}) {
 	const map = snapshot.map || {}
 	const story = snapshot.story || {}
+	const classic = snapshot.classic || {}
+	const player = classic.player || {}
 	const runtime = createClassicGameRuntime({ staticRoot: options.staticRoot || DEFAULT_STATIC_ROOT })
 	const baseActions = Array.isArray(snapshot.legalActions) ? snapshot.legalActions : []
 	const nearbyActors = Array.isArray(snapshot.nearbyActors) ? snapshot.nearbyActors : []
 	const currentMapId = map.id || story.currentMapId || 'mulberryTown'
+	const classicActors = classic.actors && typeof classic.actors === 'object'
+		? Object.values(classic.actors)
+		: []
+	const nearbyEnemies = nearbyActors.filter(isEnemy).map(publicActor)
+	const nearbyNpcs = nearbyActors.filter(isNpc).map(publicActor)
 	return {
 		mode: 'classic-autonomous',
 		currentMapId,
@@ -550,9 +557,17 @@ function getClassicRuntimeSnapshot(snapshot = {}, options = {}) {
 		currentGoal: (snapshot.goblin && snapshot.goblin.goal) || story.currentObjective || 'Live as Chatty inside the classic roguelike.',
 		currentObjective: getCurrentObjective(snapshot),
 		legalActions: uniqueActions(baseActions.concat(CLASSIC_ROGUELIKE_ACTIONS)),
-		inventorySummary: Array.isArray(snapshot.inventorySummary) ? snapshot.inventorySummary : DEFAULT_INVENTORY.slice(),
-		nearbyEnemies: nearbyActors.filter(isEnemy).map(publicActor),
-		nearbyNpcs: nearbyActors.filter(isNpc).map(publicActor),
+		playerStats: {
+			hp: Number.isInteger(player.hp) ? player.hp : DEFAULT_PLAYER.hp,
+			maxHp: Number.isInteger(player.maxHp) ? player.maxHp : DEFAULT_PLAYER.maxHp,
+			mana: Number.isInteger(player.mana) ? player.mana : DEFAULT_PLAYER.mana,
+			maxMana: Number.isInteger(player.maxMana) ? player.maxMana : DEFAULT_PLAYER.maxMana
+		},
+		inventorySummary: Array.isArray(player.inventory) ? player.inventory : Array.isArray(snapshot.inventorySummary) ? snapshot.inventorySummary : DEFAULT_INVENTORY.slice(),
+		equipmentSummary: player.equipment || {},
+		spellSummary: Array.isArray(player.spellbook) ? player.spellbook : spellbookFromDefaults(),
+		nearbyEnemies: nearbyEnemies.length ? nearbyEnemies : classicActors.filter(actor => actor.hostile).map(publicActor).slice(0, 8),
+		nearbyNpcs: nearbyNpcs.length ? nearbyNpcs : classicActors.filter(isNpc).map(publicActor).slice(0, 8),
 		portalLinks: map.portalLinks || runtime.getPortalLinks(currentMapId),
 		mapRouteTargets: runtime.getAvailableMapIds().filter(mapId => mapId !== currentMapId)
 	}

@@ -9,7 +9,11 @@ const DEFAULT_NPC_DIALOGUE_COOLDOWN_TURNS = 6
 const DEFAULT_MAX_NPC_MOVES_PER_TURN = 4
 const DEFAULT_MAX_NPC_SPEECH_EVENTS_PER_TURN = 1
 const { getCharacterSpriteForActor } = require('./characterSprites')
-const { getClassicRuntimeSnapshot } = require('./classicRuntime')
+const {
+	applyClassicAction,
+	createClassicStateFromWorld,
+	getClassicRuntimeSnapshot
+} = require('./classicRuntime')
 const { createFeedEntryForEvent } = require('./feedNarrator')
 const {
 	getPortalLinksForTiledMap,
@@ -571,6 +575,7 @@ class GoblinWorld {
 		}
 		this.state.story = normalizeStoryState(this.state.story || {}, this.state.turn || 0)
 		this.state.events = sanitizePersistedEvents(this.state.events)
+		this.ensureClassicState()
 		this.eventLimit = options.eventLimit || DEFAULT_EVENT_LIMIT
 		if (!Number.isInteger(this.state.nextEventId)) {
 			const highestEventId = (this.state.events || []).reduce((highest, event) => {
@@ -596,6 +601,7 @@ class GoblinWorld {
 		}
 		this.state.story = normalizeStoryState(this.state.story || {}, this.state.turn || 0)
 		this.state.events = sanitizePersistedEvents(this.state.events)
+		this.ensureClassicState(true)
 		if (!Number.isInteger(this.state.nextEventId)) {
 			const highestEventId = (this.state.events || []).reduce((highest, event) => {
 				return Number.isInteger(event.id) ? Math.max(highest, event.id) : highest
@@ -626,6 +632,7 @@ class GoblinWorld {
 			snapshot.story.navigation = navigation
 			snapshot.story.directorPlan = enrichPlanWithNavigation(snapshot.story.directorPlan, navigation)
 		}
+		snapshot.runtime = getClassicRuntimeSnapshot({ ...snapshot, classic: this.state.classic })
 		return clone(snapshot)
 	}
 
@@ -634,8 +641,21 @@ class GoblinWorld {
 		return {
 			story: snapshot.story,
 			tasks: snapshot.tasks,
-			runtime: getClassicRuntimeSnapshot(snapshot)
+			runtime: snapshot.runtime || getClassicRuntimeSnapshot({ ...snapshot, classic: this.state.classic })
 		}
+	}
+
+	ensureClassicState(force = false) {
+		const currentMapId = this.state.map && this.state.map.id
+		if (!force && this.state.classic && this.state.classic.mode === 'classic-autonomous' && this.state.classic.currentMapId === currentMapId) {
+			return this.state.classic
+		}
+		this.state.classic = createClassicStateFromWorld({
+			map: this.state.map,
+			goblin: this.state.goblin,
+			story: this.state.story
+		}, { staticRoot: this.staticRoot })
+		return this.state.classic
 	}
 
 	getTasks() {
@@ -1083,6 +1103,7 @@ class GoblinWorld {
 				currentMapId: targetMapId
 			}
 		}
+		this.ensureClassicState(true)
 		return {
 			map: this.state.map,
 			goblin: {
@@ -1091,6 +1112,54 @@ class GoblinWorld {
 				animation: this.state.goblin.animation,
 				movementState: this.state.goblin.movementState
 			}
+		}
+	}
+
+	shouldApplyClassicDecision(decision = {}) {
+		const action = decision.action
+		if (action === 'pickup' || action === 'pick_up' || action === 'equip' || action === 'use' || action === 'rest' || action === 'flee' || action === 'reposition') {
+			return true
+		}
+		this.ensureClassicState()
+		const targetId = decision.target && decision.target.id
+		if ((action === 'attack' || action === 'cast' || action === 'fire') && targetId) {
+			return Boolean(this.state.classic.actors && this.state.classic.actors[targetId] && this.state.classic.actors[targetId].hostile)
+		}
+		if (action === 'interact' && targetId) {
+			return Boolean(this.state.classic.objects && this.state.classic.objects[targetId])
+		}
+		return false
+	}
+
+	applyClassicResult(result = {}) {
+		if (result.state) this.state.classic = result.state
+		const delta = result.worldDelta || {}
+		if (delta.chatty) {
+			if (delta.chatty.position) this.state.goblin.position = normalizePosition(delta.chatty.position, this.state.goblin.position)
+			if (Number.isInteger(delta.chatty.hp)) this.state.goblin.hp = delta.chatty.hp
+			if (Number.isInteger(delta.chatty.mana)) this.state.goblin.mana = delta.chatty.mana
+		}
+		if (delta.items && Array.isArray(delta.items.removed) && delta.items.removed.length) {
+			const removed = new Set(delta.items.removed)
+			this.state.map.actors = (this.state.map.actors || []).filter(actor => !removed.has(actor.id))
+		}
+		if (delta.actors) {
+			Object.entries(delta.actors).forEach(([actorId, actorDelta]) => {
+				const actor = (this.state.map.actors || []).find(candidate => candidate.id === actorId)
+				if (actorDelta && actorDelta.removed) {
+					this.state.map.actors = (this.state.map.actors || []).filter(candidate => candidate.id !== actorId)
+					return
+				}
+				if (!actor) return
+				if (actorDelta.position) {
+					actor.x = actorDelta.position.x
+					actor.y = actorDelta.position.y
+				}
+				if (actorDelta.blocked === false) {
+					this.state.map.blocked = (this.state.map.blocked || []).filter(blocked => !samePosition(blocked, actor))
+					actor.blocked = false
+				}
+			})
 		}
 	}
 
@@ -1227,16 +1296,21 @@ class GoblinWorld {
 		}
 
 		const questResult = this.applyQuestInteractionForDecision(decision)
+		let classicResult = null
+		if (this.shouldApplyClassicDecision(decision)) {
+			classicResult = applyClassicAction(this.ensureClassicState(), this.getSnapshot(), decision, { seed: this.state.turn })
+			this.applyClassicResult(classicResult)
+		}
 		this.state.goblin.animation = DEFAULT_ANIMATION
 		this.state.goblin.movementState = getIdleMovementStateForDecision(decision)
 		return this.appendEvent({
 			type: questResult.eventPatch ? questResult.eventPatch.type : decision.action === 'inspect' ? 'thought' : 'action',
 			action: decision.action,
 			target: questResult.eventPatch && questResult.eventPatch.target ? questResult.eventPatch.target : decision.target || null,
-			message: decision.goblinUtterance || `The goblin tries to ${decision.action}.`,
+			message: decision.goblinUtterance || (questResult.eventPatch && questResult.eventPatch.message) || (classicResult && classicResult.eventPatch && classicResult.eventPatch.message) || `The goblin tries to ${decision.action}.`,
 			publicRationale: decision.publicRationale || (questResult.eventPatch && questResult.eventPatch.publicRationale) || '',
 			controller: questResult.eventPatch && questResult.eventPatch.controller ? questResult.eventPatch.controller : controller,
-			worldDelta: mergeWorldDelta(questResult.eventPatch && questResult.eventPatch.worldDelta, {
+			worldDelta: mergeWorldDelta(classicResult && classicResult.worldDelta, questResult.eventPatch && questResult.eventPatch.worldDelta, {
 				goblin: {
 					position: this.state.goblin.position,
 					facing: this.state.goblin.facing,

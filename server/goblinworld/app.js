@@ -124,7 +124,7 @@ function createGoblinWorldApp(options = {}) {
 			...snapshot,
 			model: controller.model,
 			controller,
-			runtime: getClassicRuntimeSnapshot(snapshot, { staticRoot })
+			runtime: snapshot.runtime || getClassicRuntimeSnapshot(snapshot, { staticRoot })
 		})
 	})
 
