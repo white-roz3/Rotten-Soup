@@ -51,10 +51,12 @@ const {
 	recordSceneChange,
 	selectScene
 } = require('./sceneDirector')
+const { getCompactNpcSoul } = require('./souls')
 const { applyTaskRewards, evaluateTask, setUnlock, uniquePush } = require('./taskRules')
 const { getZoneForPosition } = require('./worldZones')
 
 const MAX_REASONABLE_STORY_DAY = 30
+const CHATTY_NAME = 'Chatty, the chosen one'
 
 function clone(value) {
 	return JSON.parse(JSON.stringify(value))
@@ -737,6 +739,18 @@ function updateRelationshipForDialogue(story, actorKey, turn) {
 	return relationship
 }
 
+function createSoulFallbackFollowUp(actorKey, line, story = {}, turn = 0) {
+	const soul = getCompactNpcSoul(actorKey)
+	const hooks = Array.isArray(soul.chattyReplyHooks) ? soul.chattyReplyHooks.filter(Boolean) : []
+	if (!hooks.length) return null
+	const relationship = story.relationships && story.relationships[actorKey] ? story.relationships[actorKey] : {}
+	const seed = Math.abs((turn || 0) + (relationship.talks || 0) + String(line || '').length)
+	return {
+		actor: CHATTY_NAME,
+		line: `Chatty: ${hooks[seed % hooks.length]}`
+	}
+}
+
 function selectStoryNpcDialogueLine(actor, storyInput, turn = 0, context = {}) {
 	let story = normalizeStoryState(storyInput, turn)
 	const actorKey = getActorStoryKey(actor)
@@ -776,12 +790,15 @@ function selectStoryNpcDialogueLine(actor, storyInput, turn = 0, context = {}) {
 	})
 	story.dialogueHistory[actorKey] = story.dialogueHistory[actorKey].filter(entry => turn - entry.turn <= STORY_TURNS_PER_HOUR * 4)
 	updateRelationshipForDialogue(story, actorKey, turn)
+	const followUp = scripted.followUp
+		? scripted.followUp
+		: createSoulFallbackFollowUp(actorKey, line, story, turn)
 	return {
 		story,
 		line,
 		lineId: scripted.lineId || `legacy.${actorKey}.${phase.id}.${category}.${turn}`,
 		conversationId: scripted.conversationId || `${phase.id}.free.dialogue::${actorKey}`,
-		followUp: scripted.followUp || null,
+		followUp,
 		actorKey,
 		category,
 		identity: scripted.identity,
