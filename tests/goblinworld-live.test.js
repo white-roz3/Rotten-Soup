@@ -2444,6 +2444,37 @@ test('live world seeds a plain Chatty thought when visible feed has starved', ()
 	assert.doesNotMatch(event.toJSON().feed.text, /snack destiny|civic trauma|walls gossip|suspicious feet|prophecy/i)
 })
 
+test('live world suppresses repeated visible Chatty feed lines', () => {
+	const world = new GoblinWorld(createInitialWorld({ turn: 12 }))
+	const first = world.appendEvent({
+		type: 'thought',
+		actor: 'Chatty, the chosen one',
+		action: 'think',
+		message: 'I need to find the bartender and ask a clear question.',
+		feed: {
+			speaker: 'Chatty',
+			text: 'I need to find the bartender and ask a clear question.',
+			tone: 'thought',
+			visible: true
+		}
+	})
+	const second = world.appendEvent({
+		type: 'thought',
+		actor: 'Chatty, the chosen one',
+		action: 'think',
+		message: 'I need to find the bartender and ask a clear question.',
+		feed: {
+			speaker: 'Chatty',
+			text: 'I need to find the bartender and ask a clear question.',
+			tone: 'thought',
+			visible: true
+		}
+	})
+
+	assert.ok(first.toJSON().feed)
+	assert.strictEqual(second.toJSON().feed, null)
+})
+
 test('feed narrator rejects curated feed objects with system event types or debug text', () => {
 	const systemSpeaker = createEvent({
 		id: 745,

@@ -820,6 +820,31 @@ class GoblinWorld {
 		return createFeedStatus(this.state.events.slice(-this.eventLimit), this.state.status, this.state.turn)
 	}
 
+	getRecentVisibleFeedEntries(limit = 30) {
+		return getVisibleFeedEvents(this.state.events.slice(-limit))
+	}
+
+	hasRecentVisibleFeedText(speaker, text, limit = 30) {
+		const normalizedSpeaker = String(speaker || '').trim().toLowerCase()
+		const normalizedText = String(text || '').trim().toLowerCase()
+		if (!normalizedSpeaker || !normalizedText) return false
+		return this.getRecentVisibleFeedEntries(limit).some(event => {
+			const feed = event.feed || {}
+			return String(feed.speaker || '').trim().toLowerCase() === normalizedSpeaker &&
+				String(feed.text || '').trim().toLowerCase() === normalizedText
+		})
+	}
+
+	choosePlainChattyLine(lines = []) {
+		if (!lines.length) return ''
+		const offset = Math.abs((this.state.turn || 0) + (this.state.nextEventId || 0)) % lines.length
+		for (let index = 0; index < lines.length; index += 1) {
+			const line = lines[(offset + index) % lines.length]
+			if (!this.hasRecentVisibleFeedText('Chatty', line)) return line
+		}
+		return lines[offset]
+	}
+
 	shouldSeedPlainChattyFeed(input = {}) {
 		const actor = input.actor || this.state.goblin.name
 		if (actor !== CHATTY_NAME && actor !== this.state.goblin.name) return false
@@ -840,21 +865,45 @@ class GoblinWorld {
 		const title = String(activeTask && activeTask.title || '').toLowerCase()
 		const action = input.action || ''
 		if (target.kind === 'dialogue' || /speaking npc|voice|bartender|mayor|talk|speak/.test(title)) {
-			return 'I need to talk to someone who can explain what is going on.'
+			return this.choosePlainChattyLine([
+				'I need to talk to someone who can explain what is going on.',
+				'I should find the right person and ask a clear question.',
+				'I need answers before I make this worse.'
+			])
 		}
 		if (target.kind === 'combat' || action === 'attack' || action === 'cast') {
-			return 'I need to stay calm, watch the threat, and act carefully.'
+			return this.choosePlainChattyLine([
+				'I need to stay calm, watch the threat, and act carefully.',
+				'I should keep my distance unless I have to strike.',
+				'I need to survive this before I solve anything else.'
+			])
 		}
 		if (target.kind === 'inspect' || action === 'inspect' || action === 'examine') {
-			return 'I should look closely before I make this worse.'
+			return this.choosePlainChattyLine([
+				'I should look closely before I make this worse.',
+				'I need to check what is actually here.',
+				'I should inspect this before guessing.'
+			])
 		}
 		if (target.kind === 'item' || action === 'pickup') {
-			return 'I should take the useful thing and keep moving.'
+			return this.choosePlainChattyLine([
+				'I should take the useful thing and keep moving.',
+				'I need supplies if I am going farther than the road.',
+				'I should keep what helps and leave the rest.'
+			])
 		}
 		if (target.kind === 'goal' || target.kind === 'choice') {
-			return 'I need to choose what matters next and follow through.'
+			return this.choosePlainChattyLine([
+				'I need to choose what matters next and follow through.',
+				'I should pick a clear next step and commit to it.',
+				'I need a plan I can actually finish.'
+			])
 		}
-		return 'I should keep moving, pay attention, and find the next useful lead.'
+		return this.choosePlainChattyLine([
+			'I should keep moving, pay attention, and find the next useful lead.',
+			'I need to leave the familiar path and check the next place.',
+			'I should keep looking until something useful changes.'
+		])
 	}
 
 	appendEvent(input) {
@@ -875,6 +924,9 @@ class GoblinWorld {
 			position: this.state.goblin.position,
 			...eventInput
 		})
+		if (event.feed && this.hasRecentVisibleFeedText(event.feed.speaker, event.feed.text)) {
+			event.feed = null
+		}
 		this.state.events.push(event.toJSON())
 		if (this.state.events.length > this.eventLimit * 2) {
 			this.state.events = this.state.events.slice(-this.eventLimit)
