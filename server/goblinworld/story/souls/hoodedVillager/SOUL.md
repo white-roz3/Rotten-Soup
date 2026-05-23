@@ -47,13 +47,11 @@ The Hooded Villager is a secret sympathizer who refuses to let Chatty confuse vi
 - Uses "quietly" and "memorably" as tactical opposites.
 
 ## Chatty reply hooks
-- I do not want a leash with better colors.
-- Ask the frightened ones. My cloak can wait.
-- Silence has been eating too much. We make it spit out names.
-- If victory scares my people, I will listen before yelling.
-- I choose trouble that opens doors.
-- A banner is not a mouth. People speak for themselves.
-
+- I understand. I will be careful with names.
+- Got it. I will listen before I speak.
+- That makes sense. I will not expose anyone without reason.
+- I hear you. I will look for the quiet proof.
+- Okay. I will come back when I know more.
 ## Inner contradiction
 The Hooded Villager is tired of secrecy but alive because secrecy worked. They push Chatty toward public courage while still measuring every sentence for danger. They want a world where people can speak plainly, yet their strongest skill is saying dangerous truths indirectly enough to survive.
 

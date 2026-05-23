@@ -8,6 +8,7 @@ const DEFAULT_NPC_ATTENTION_RADIUS = 8
 const DEFAULT_NPC_DIALOGUE_COOLDOWN_TURNS = 6
 const DEFAULT_MAX_NPC_MOVES_PER_TURN = 4
 const DEFAULT_MAX_NPC_SPEECH_EVENTS_PER_TURN = 1
+const FEED_STARVATION_TURNS = 8
 const { getCharacterSpriteForActor } = require('./characterSprites')
 const {
 	applyClassicAction,
@@ -34,7 +35,6 @@ const {
 	getStoryTasks,
 	getNextSceneScriptSpeaker,
 	hasSceneScript,
-	isSceneScriptComplete,
 	normalizeStoryState,
 	SCENE_SCRIPTS,
 	selectStoryNpcDialogueLine
@@ -234,6 +234,21 @@ function getCurrentScriptContext(story, activeTask, scene = {}) {
 	}
 }
 
+function hasRecentConversationOutcome(story = {}, activeTask = null, turn = 0) {
+	if (!activeTask || !activeTask.id) return false
+	const dialogue = story.dialogue && typeof story.dialogue === 'object' ? story.dialogue : {}
+	const activeConversation = dialogue.activeConversation || {}
+	if (activeConversation.questId === activeTask.id && activeConversation.status !== 'complete') return true
+	const recentHistory = Array.isArray(dialogue.conversationHistory)
+		? dialogue.conversationHistory
+		: []
+	if (recentHistory.some(entry => entry && entry.questId === activeTask.id && (!Number.isInteger(entry.turn) || turn - entry.turn <= 30))) {
+		return true
+	}
+	const spokenLines = Array.isArray(dialogue.spokenLines) ? dialogue.spokenLines : []
+	return spokenLines.some(lineId => String(lineId || '').includes(`scene-script.${activeTask.id}.`))
+}
+
 function isNpcRelevantToCurrentConversation(actor, activeTask, scene = {}, options = {}, story = {}) {
 	if (options.allowAmbientNpcDialogue) return true
 	const actorKey = getActorStoryKey(actor)
@@ -370,6 +385,23 @@ function sanitizePersistedEvent(event) {
 
 function sanitizePersistedEvents(events) {
 	return Array.isArray(events) ? events.map(sanitizePersistedEvent) : []
+}
+
+function getVisibleFeedEvents(events = []) {
+	return events.filter(event => event && event.feed && event.feed.visible !== false)
+}
+
+function createFeedStatus(events = [], status = 'live', turn = 0) {
+	const visibleEvents = getVisibleFeedEvents(events)
+	const lastVisible = visibleEvents.length ? visibleEvents[visibleEvents.length - 1] : null
+	return {
+		status,
+		visibleFeedCount: visibleEvents.length,
+		hiddenEventCount: Math.max(0, events.length - visibleEvents.length),
+		lastVisibleFeedTurn: lastVisible && Number.isInteger(lastVisible.turn) ? lastVisible.turn : null,
+		isWaitingForInitialEvents: events.length === 0 && status !== 'live',
+		feedStarved: events.length > 0 && visibleEvents.length === 0
+	}
 }
 
 function createDefaultMap() {
@@ -676,6 +708,7 @@ class GoblinWorld {
 			story: getStorySnapshot({ ...this.state.story, currentMapId: this.state.map && this.state.map.id }, this.state.turn),
 			memory: this.state.memory,
 			events: this.state.events.slice(-this.eventLimit),
+			feedStatus: createFeedStatus(this.state.events.slice(-this.eventLimit), this.state.status, this.state.turn),
 			legalActions: this.getLegalActions(),
 			legalMoves: this.getLegalMoves(),
 			tasks: this.getTasks(),
@@ -783,13 +816,64 @@ class GoblinWorld {
 		return tiles
 	}
 
+	getFeedStatus() {
+		return createFeedStatus(this.state.events.slice(-this.eventLimit), this.state.status, this.state.turn)
+	}
+
+	shouldSeedPlainChattyFeed(input = {}) {
+		const actor = input.actor || this.state.goblin.name
+		if (actor !== CHATTY_NAME && actor !== this.state.goblin.name) return false
+		if (input.feed !== undefined) return false
+		if (input.controller === 'dialogue-hold') return false
+		if (input.target && (input.target.kind === 'portal' || input.target.portalId)) return false
+		if (input.type && !['action', 'thought'].includes(input.type)) return false
+		if (input.type === 'action' && !['move', 'wait', 'interact', 'inspect', 'examine'].includes(input.action || 'wait')) return false
+		const feedStatus = this.getFeedStatus()
+		if (!this.state.events.length) return true
+		if (feedStatus.lastVisibleFeedTurn === null) return this.state.events.length >= FEED_STARVATION_TURNS
+		return this.state.turn - feedStatus.lastVisibleFeedTurn >= FEED_STARVATION_TURNS
+	}
+
+	createPlainChattyThought(input = {}) {
+		const activeTask = this.getTasks().find(task => task.status === 'active' || task.status === 'combat')
+		const target = activeTask && activeTask.target ? activeTask.target : {}
+		const title = String(activeTask && activeTask.title || '').toLowerCase()
+		const action = input.action || ''
+		if (target.kind === 'dialogue' || /speaking npc|voice|bartender|mayor|talk|speak/.test(title)) {
+			return 'I need to talk to someone who can explain what is going on.'
+		}
+		if (target.kind === 'combat' || action === 'attack' || action === 'cast') {
+			return 'I need to stay calm, watch the threat, and act carefully.'
+		}
+		if (target.kind === 'inspect' || action === 'inspect' || action === 'examine') {
+			return 'I should look closely before I make this worse.'
+		}
+		if (target.kind === 'item' || action === 'pickup') {
+			return 'I should take the useful thing and keep moving.'
+		}
+		if (target.kind === 'goal' || target.kind === 'choice') {
+			return 'I need to choose what matters next and follow through.'
+		}
+		return 'I should keep moving, pay attention, and find the next useful lead.'
+	}
+
 	appendEvent(input) {
+		const eventInput = { ...input }
+		if (this.shouldSeedPlainChattyFeed(eventInput)) {
+			eventInput.feed = {
+				speaker: 'Chatty',
+				text: this.createPlainChattyThought(eventInput),
+				tone: 'thought',
+				priority: 'normal',
+				visible: true
+			}
+		}
 		const event = createEvent({
 			id: this.state.nextEventId++,
 			turn: this.state.turn,
 			actor: this.state.goblin.name,
 			position: this.state.goblin.position,
-			...input
+			...eventInput
 		})
 		this.state.events.push(event.toJSON())
 		if (this.state.events.length > this.eventLimit * 2) {
@@ -870,10 +954,14 @@ class GoblinWorld {
 		if (decision.target && decision.target.questId && decision.target.questId !== task.id) {
 			return { applied: false, eventPatch: null }
 		}
-		const gatedKinds = new Set(['dialogue', 'rumor', 'ally', 'speech', 'goal', 'choice', 'ideology'])
+		const conversationKinds = new Set(['dialogue', 'rumor', 'ally', 'speech'])
 		const taskKind = task.target && task.target.kind
 		const scriptContext = getCurrentScriptContext(this.state.story, task, this.state.story.scene)
-		if (gatedKinds.has(taskKind) && hasSceneScript(scriptContext) && !isSceneScriptComplete(this.state.story, scriptContext)) {
+		if (
+			conversationKinds.has(taskKind) &&
+			hasSceneScript(scriptContext) &&
+			!hasRecentConversationOutcome(this.state.story, task, this.state.turn)
+		) {
 			return {
 				applied: false,
 				eventPatch: null,

@@ -47,13 +47,11 @@ The Market Trader begins as a profit first survivor and becomes a logistics ally
 - Prefers concrete nouns over grand ideals.
 
 ## Chatty reply hooks
-- I hear coins trying to become courage.
-- Your invoice has a suspiciously heroic smell.
-- I accept bread logistics as serious politics.
-- If freedom buys more bread, we defend the bakery of tomorrow.
-- Charge fear double. It has been freeloading.
-- Show me the route where help stops pretending.
-
+- I understand. I will count supplies before I promise them.
+- Got it. I will ask what this costs.
+- That makes sense. I will look for proof in the receipts.
+- I hear you. I will make the useful choice first.
+- Okay. I will bring back what people actually need.
 ## Inner contradiction
 The Market Trader believes survival is a ledger of risks, but every risk they avoid gets paid by someone poorer, smaller, or more hunted. They want profit because profit feels measurable and safe, yet they keep discovering that the most valuable thing in Mulberry is people walking freely enough to buy bread tomorrow.
 
@@ -95,7 +93,7 @@ The Market Trader believes survival is a ledger of risks, but every risk they av
 - Safe goblin roads make them openly proud in accounting language.
 
 ## Example exchanges
-- Market Trader: I can sell cloth. I cannot sell plausible deniability. / Chatty: Your invoice has a suspiciously heroic smell.
+- Market Trader: I can sell cloth. I cannot sell plausible deniability. / Chatty: I understand. I will buy what helps and keep the rest quiet.
 - Market Trader: Free people buy more bread than frightened people. / Chatty: Then we defend the bakery of tomorrow.
 - Market Trader: The alley costs less than the main road and lies better. / Chatty: Show me the route where help stops pretending.
 

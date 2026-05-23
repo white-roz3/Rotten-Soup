@@ -1133,7 +1133,7 @@ test('scene scripts take priority over broad phase dialogue and include Chatty r
 	assert.strictEqual(result.line, 'Bartender: Chatty, start with the easy truth. You woke up, the cloak stayed, and everyone here noticed.')
 	assert.deepStrictEqual(result.followUp, {
 		actor: 'Chatty, the chosen one',
-		line: 'Chatty: I noticed too. The noticing had knees and was me.'
+		line: 'Chatty: I understand. I woke up in this body and I need answers.'
 	})
 	assert.strictEqual(result.lineId, 'scene-script.phase-1-find-voice.bartender.0')
 	assert.ok(result.story.callbacks.includes('scene-script:phase-1-find-voice'))
@@ -1269,7 +1269,7 @@ test('every authored scene beat includes a Chatty reply', () => {
 	assert.deepStrictEqual(missing, [])
 })
 
-test('dialogue objectives wait for authored conversation before completing', () => {
+test('dialogue objectives complete after a natural exchange instead of waiting for every authored script line', () => {
 	const world = new GoblinWorld(createInitialWorld({
 		map: {
 			name: 'Conversation Gate',
@@ -1307,34 +1307,45 @@ test('dialogue objectives wait for authored conversation before completing', () 
 		}
 	}))
 
-	const blocked = world.applyDecision({
+	const events = world.advanceNpcs({
+		dialogueRadius: 2,
+		dialogueCooldownTurns: 0,
+		maxNpcSpeechEventsPerTurn: 1
+	})
+	assert.strictEqual(events.length, 2)
+	assert.strictEqual(events[0].actor, 'Bartender')
+	assert.strictEqual(events[1].actor, 'Chatty, the chosen one')
+
+	const completed = world.applyDecision({
 		action: 'interact',
 		target: { id: 'bartender', name: 'Bartender', reached: true, questId: 'phase-1-find-voice' },
-		goblinUtterance: 'Bartender, I have questions with ears.',
+		goblinUtterance: 'I understand. I will ask the right questions.',
 		controller: 'fallback'
 	})
 
-	assert.strictEqual(blocked.controller, 'dialogue-hold')
-	assert.strictEqual(world.getSnapshot().story.facts.findASpeakingNpc, undefined)
-	assert.strictEqual(blocked.toJSON().feed, null)
-
-	for (let index = 0; index < 3; index += 1) {
-		const events = world.advanceNpcs({
-			dialogueRadius: 2,
-			dialogueCooldownTurns: 0,
-			maxNpcSpeechEventsPerTurn: 1
-		})
-		assert.strictEqual(events.length, 2)
-		assert.strictEqual(events[0].actor, 'Bartender')
-		assert.strictEqual(events[1].actor, 'Chatty, the chosen one')
-		if (index < 2) {
-			assert.strictEqual(world.getSnapshot().story.facts.firstVoice, undefined)
-		}
-	}
-
+	assert.notStrictEqual(completed.controller, 'dialogue-hold')
 	assert.strictEqual(world.getSnapshot().story.facts.firstVoice, true)
 	world.advanceStory()
 	assert.notStrictEqual(world.getTasks().find(task => task.status === 'active' || task.status === 'combat').id, 'phase-1-find-voice')
+})
+
+test('authored Chatty replies use plain practical speech instead of forced prophecy jokes', () => {
+	const story = require('../server/goblinworld/story')
+	const banned = /snack destiny|civic trauma|walls gossip|cloak prophecy|historic inconvenience|suspicious feet|furniture be warned|coward box|paperwork never/i
+	const chattyLines = []
+	Object.values(story.SCENE_SCRIPTS).forEach(script => {
+		;(script.beats || []).forEach(beat => {
+			if (beat.chatty) chattyLines.push(beat.chatty)
+		})
+	})
+	story.getAllStoryText()
+		.filter(line => /^Chatty:/i.test(String(line || '').trim()))
+		.forEach(line => chattyLines.push(line))
+
+	assert.ok(chattyLines.length > 50)
+	chattyLines.forEach(line => {
+		assert.doesNotMatch(line, banned, line)
+	})
 })
 
 test('NPC speaker arbitration follows the next authored beat instead of nearest random participant', () => {
@@ -2394,6 +2405,41 @@ test('feed narrator hides system story events from the adventure feed', () => {
 	}
 })
 
+test('live world seeds a plain Chatty thought when visible feed has starved', () => {
+	const world = new GoblinWorld(createInitialWorld({
+		turn: 40,
+		story: {
+			phaseId: 'phase-1',
+			lastPhaseAnnounced: 'phase-1',
+			completedTasks: ['phase-1-test-body']
+		}
+	}))
+	for (let id = 760; id < 772; id += 1) {
+		world.state.events.push({
+			id,
+			turn: id - 760,
+			type: 'action',
+			actor: 'NPC',
+			action: 'move',
+			message: 'NPC wanders to 13,13.',
+			feed: null
+		})
+	}
+
+	const event = world.applyDecision({
+		action: 'move',
+		target: { x: world.state.goblin.position.x + 1, y: world.state.goblin.position.y },
+		publicRationale: 'Chatty keeps moving toward someone who can explain the town.',
+		goblinUtterance: 'I need to find someone who can explain what is going on.',
+		controller: 'budget-fallback'
+	})
+
+	assert.ok(event.toJSON().feed)
+	assert.strictEqual(event.toJSON().feed.speaker, 'Chatty')
+	assert.match(event.toJSON().feed.text, /I need|I should|I understand|I will/)
+	assert.doesNotMatch(event.toJSON().feed.text, /snack destiny|civic trauma|walls gossip|suspicious feet|prophecy/i)
+})
+
 test('feed narrator rejects curated feed objects with system event types or debug text', () => {
 	const systemSpeaker = createEvent({
 		id: 745,
@@ -2740,8 +2786,8 @@ test('Chatty fallback narration is keyed to scene pressure instead of API state'
 		}
 	}, 'wait')
 
-	assert.strictEqual(travel, 'I follow the smell of old paper and refuse to be impressed by doors.')
-	assert.strictEqual(listen, 'I plant both feet and let the nearby voice become useful.')
+	assert.strictEqual(travel, 'I need to find the ledger and understand who it hurt.')
+	assert.strictEqual(listen, 'I should listen before I answer.')
 	assert.doesNotMatch(`${travel} ${listen}`, /fallback|api|model|controller/i)
 	assert.doesNotMatch(`${travel} ${listen}`, /^Chatty\b|\bChatty follows\b|\bChatty plants\b/i)
 })
@@ -2960,7 +3006,7 @@ test('serves a shared live state snapshot without exposing server secrets', asyn
 		assert.ok(snapshot.build)
 		assert.ok(snapshot.build.gitSha)
 		assert.ok(snapshot.build.startedAt)
-		assert.strictEqual(snapshot.build.eventSanitizerVersion, 'strict-character-feed-v3')
+		assert.strictEqual(snapshot.build.eventSanitizerVersion, 'strict-character-feed-v4-natural-dialogue')
 		assert.strictEqual(snapshot.build.runtime.mode, 'classic-autonomous')
 		assert.strictEqual(JSON.stringify(snapshot).includes('OPENAI_API_KEY'), false)
 		assert.strictEqual(JSON.stringify(snapshot).includes('ANTHROPIC_API_KEY'), false)
@@ -3000,6 +3046,39 @@ test('live state response sanitizes poisoned persisted feed speakers at the fina
 		assert.ok(poisoned)
 		assert.strictEqual(poisoned.feed, null)
 		assert.strictEqual(getBadFeedEvents(snapshot.events).length, 0)
+	} finally {
+		await new Promise(resolve => server.close(resolve))
+	}
+})
+
+test('live state exposes feed status when all buffered events are hidden', async () => {
+	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 3 }, turn: 20 }))
+	for (let id = 920; id < 1040; id += 1) {
+		world.state.events.push({
+			id,
+			turn: id - 900,
+			type: 'action',
+			actor: 'NPC',
+			action: 'move',
+			message: `NPC wanders to ${id % 30},13.`,
+			feed: null
+		})
+	}
+	const app = createGoblinWorldApp({ world, startLoop: false, persistence: false, loop: { apiKey: '' } })
+	const server = app.listen(0)
+	await waitForListening(server)
+
+	try {
+		const { port } = server.address()
+		const response = await fetch(`http://127.0.0.1:${port}/api/live/state`)
+		const snapshot = await response.json()
+
+		assert.strictEqual(response.status, 200)
+		assert.ok(snapshot.feedStatus)
+		assert.strictEqual(snapshot.feedStatus.status, 'live')
+		assert.strictEqual(snapshot.feedStatus.visibleFeedCount, 0)
+		assert.strictEqual(snapshot.feedStatus.hiddenEventCount, 120)
+		assert.strictEqual(snapshot.feedStatus.isWaitingForInitialEvents, false)
 	} finally {
 		await new Promise(resolve => server.close(resolve))
 	}
@@ -3061,7 +3140,7 @@ test('serves a safe live health status without secrets or memory', async () => {
 		assert.ok(health.build)
 		assert.ok(health.build.gitSha)
 		assert.ok(health.build.startedAt)
-		assert.strictEqual(health.build.eventSanitizerVersion, 'strict-character-feed-v3')
+		assert.strictEqual(health.build.eventSanitizerVersion, 'strict-character-feed-v4-natural-dialogue')
 		assert.strictEqual(health.runtime.mode, 'classic-autonomous')
 		assert.strictEqual(health.events.badFeedCount, 0)
 		assert.strictEqual(serialized.includes('ANTHROPIC_API_KEY'), false)

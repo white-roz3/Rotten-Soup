@@ -47,13 +47,11 @@ The Forest Wanderer is a pathfinder and witness who knows that roads are politic
 - Avoids flowery mystery without function.
 
 ## Chatty reply hooks
-- If the road is lying, I will interrogate the dirt.
-- I choose the path old law forgot to count.
-- Moss has better handwriting than the mayor.
-- Show me the wrong mark. I will follow it correctly.
-- The cloak is ready for unreasonable geography.
-- Hidden roads are just public roads wearing a secret.
-
+- I understand. I will follow the safer path.
+- Got it. I will watch the road before trusting it.
+- That makes sense. I will look for tracks.
+- I hear you. I will not ignore the woods.
+- Okay. I will turn back if the route is wrong.
 ## Inner contradiction
 The Forest Wanderer knows how to survive by staying between places, but the story now asks them to make paths public. They trust hidden trails because hidden trails saved lives, yet they want roads that no longer need secrecy. Their guidance should always carry that tension between stealth and daylight.
 

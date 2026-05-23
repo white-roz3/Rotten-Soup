@@ -47,13 +47,11 @@ Pip is the fearful scout of the hidden goblins, suspicious because suspicion kep
 - Reacts strongly to the freedom phrase.
 
 ## Chatty reply hooks
-- I am not tax. I am bad news for tax.
-- I will wait where your fear can see me.
-- My posture is legally suspicious, but not taxable.
-- Count exits. I will count promises.
-- Small does not mean owned. We can say it twice.
-- Freedom includes hats. This is serious policy.
-
+- I understand. I am not here to trap you.
+- Got it. I will keep your hiding place safe.
+- That makes sense. I will prove it before I ask for trust.
+- I hear you. I will not speak your name without permission.
+- Okay. I will come back with help, not orders.
 ## Inner contradiction
 Pip wants proof that freedom is real, but proof requires leaving the hiding habits that kept Pip alive. They distrust chosen ones because chosen ones arrive loudly, yet they want Chatty to be real badly enough to keep asking questions. Pip's soul is fear testing hope for weak spots.
 

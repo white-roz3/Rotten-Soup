@@ -7,7 +7,7 @@ const { getRegisteredMap, loadRegisteredTiledMap } = require('./mapRegistry')
 const { getControllerStatus, startGoblinLoop } = require('./openaiGoblin')
 const { createWorldPersistence } = require('./persistence')
 
-const EVENT_SANITIZER_VERSION = 'strict-character-feed-v3'
+const EVENT_SANITIZER_VERSION = 'strict-character-feed-v4-natural-dialogue'
 const BUILD_STARTED_AT = new Date().toISOString()
 let cachedGitSha = null
 const BANNED_FEED_SPEAKERS = new Set([
@@ -151,16 +151,33 @@ function countBadFeedEvents(events) {
 	}).length
 }
 
+function createFeedStatus(events = [], status = 'live', turn = 0) {
+	const visibleEvents = Array.isArray(events)
+		? events.filter(event => event && event.feed && event.feed.visible !== false)
+		: []
+	const lastVisible = visibleEvents.length ? visibleEvents[visibleEvents.length - 1] : null
+	return {
+		status,
+		visibleFeedCount: visibleEvents.length,
+		hiddenEventCount: Math.max(0, Array.isArray(events) ? events.length - visibleEvents.length : 0),
+		lastVisibleFeedTurn: lastVisible && Number.isInteger(lastVisible.turn) ? lastVisible.turn : null,
+		isWaitingForInitialEvents: (!Array.isArray(events) || events.length === 0) && status !== 'live',
+		feedStarved: Array.isArray(events) && events.length > 0 && visibleEvents.length === 0
+	}
+}
+
 function sanitizePublicSnapshot(snapshot, staticRoot) {
+	const events = sanitizePublicEvents(snapshot.events)
 	const publicSnapshot = {
 		...snapshot,
-		events: sanitizePublicEvents(snapshot.events)
+		events
 	}
 	delete publicSnapshot.memory
 	const runtime = publicSnapshot.runtime || getClassicRuntimeSnapshot(publicSnapshot, { staticRoot })
 	return {
 		...publicSnapshot,
 		runtime,
+		feedStatus: createFeedStatus(events, publicSnapshot.status, publicSnapshot.turn),
 		build: createBuildInfo(staticRoot, runtime.mode)
 	}
 }

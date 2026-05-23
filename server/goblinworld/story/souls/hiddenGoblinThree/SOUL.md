@@ -47,13 +47,11 @@ Nib is the gentle believer of the hidden goblins, the one who wants rescue but w
 - Lets silence matter without becoming filler.
 
 ## Chatty reply hooks
-- I will not turn a rescued name into my trophy.
-- Promise list, not leash list. I understand.
-- Children behind stone, courage in front.
-- We build after we bite the chain.
-- Freedom stands. It does not ask.
-- My cloak can wait while people choose.
-
+- I understand. You do not have to trust me yet.
+- Got it. I will move slowly and explain first.
+- That makes sense. I will show proof before asking you to follow.
+- I hear you. I will not turn rescue into pressure.
+- Okay. I will come back when the path is safer.
 ## Inner contradiction
 Nib believes in rescue and fears what rescue can become when people start enjoying command. They are gentle because gentleness preserves the world that freedom is supposed to make possible, not because they are weak. Their soul asks Chatty to win in a way that leaves room for children, names, shelter, and quiet days after the shouting.
 

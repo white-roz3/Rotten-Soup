@@ -26,18 +26,18 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, start with the easy truth. You woke up, the cloak stayed, and everyone here noticed.',
-				chatty: 'Chatty: I noticed too. The noticing had knees and was me.',
+				chatty: 'Chatty: I understand. I woke up in this body and I need answers.',
 				unlocks: ['fact:firstVoice']
 			},
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, if you want answers, follow the smell of soup before Mayor Leonard turns you into paperwork.',
-				chatty: 'Chatty: Soup first, paperwork never. A clean doctrine.'
+				chatty: 'Chatty: Got it. I will start at the tavern, then speak to the mayor.'
 			},
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, the town knows your name because the wall has been muttering it for years.',
-				chatty: 'Chatty: Walls gossip badly. Still, useful wall.'
+				chatty: 'Chatty: Then I need to check the wall and find out why it knows me.'
 			}
 		]
 	},
@@ -47,12 +47,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, the cellar rats are not metaphorical, which is rude but convenient.',
-				chatty: 'Chatty: Good. I prefer enemies with teeth I can count.'
+				chatty: 'Chatty: I understand. I will inspect them before I fight.'
 			},
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, inspect before swinging. Tiny enemies still hide ugly habits.',
-				chatty: 'Chatty: I will look first, then commit historic inconvenience.'
+				chatty: 'Chatty: Got it. I will look for the weak point first.'
 			}
 		]
 	},
@@ -62,13 +62,13 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'mayor',
 				line: 'Mayor Leonard: Chatty, the ledger existed, and my office mistook locked drawers for innocence.',
-				chatty: 'Chatty: A drawer is just a coward box with handles.',
+				chatty: 'Chatty: I agree. I will be careful with that.',
 				unlocks: ['fact:ledgerExisted']
 			},
 			{
 				speaker: 'mayor',
 				line: 'Mayor Leonard: Chatty, ask me where it was kept and watch which answer makes me ashamed.',
-				chatty: 'Chatty: I am watching with both suspicious eyes.'
+				chatty: 'Chatty: Understood. I will be careful with that.'
 			}
 		]
 	},
@@ -78,32 +78,32 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, the sour barrels hide the cellar door because bad history loves a bad smell.',
-				chatty: 'Chatty: Excellent. My nose joins the revolution unwillingly.'
+				chatty: 'Chatty: Right. I will be careful with that.'
 			},
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, look for the crate with red wax and rat scratches. It has been pretending to be furniture.',
-				chatty: 'Chatty: I distrust furniture already. This is efficient.'
+				chatty: 'Chatty: I can do that. I will be careful with that.'
 			},
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, if the ledger whispers, do not bargain with it. Books love sounding official.',
-				chatty: 'Chatty: I will answer only with theft and excellent posture.'
+				chatty: 'Chatty: I will remember. I will be careful with that.'
 			},
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, bring the ledger up where lamps can embarrass it.',
-				chatty: 'Chatty: Public shame for paper. A noble menu item.'
+				chatty: 'Chatty: I understand. I will check it before I move on.'
 			},
 			{
 				speaker: 'mayor',
 				line: 'Mayor Leonard: Chatty, red wax marks the crates my courage failed to open.',
-				chatty: 'Chatty: Then I will open them with less courage and more hands.'
+				chatty: 'Chatty: Got it. I will check it before I move on.'
 			},
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, if the book whispers names, do not answer for anyone but yourself.',
-				chatty: 'Chatty: Names belong to mouths, not shelves.'
+				chatty: 'Chatty: That makes sense. I will check it before I move on.'
 			}
 		]
 	},
@@ -113,12 +113,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, mites crack where their stamps click. Listen, then hit the office out of them.',
-				chatty: 'Chatty: I hear tiny bureaucracy. I choose violence.'
+				chatty: 'Chatty: I hear you. I will check it before I move on.'
 			},
 			{
 				speaker: 'marketTrader',
 				line: 'Market Trader: Chatty, if the mites say tax, charge them rent for standing in your way.',
-				chatty: 'Chatty: Finally, economics I can bite.'
+				chatty: 'Chatty: Okay. I will check it before I move on.'
 			}
 		]
 	},
@@ -128,17 +128,17 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'forestWanderer',
 				line: 'Forest Wanderer: Chatty, lanterns end where the honest path gets scared. Keep walking after that.',
-				chatty: 'Chatty: I will follow the coward edge until it becomes useful.'
+				chatty: 'Chatty: I agree. I will check it before I move on.'
 			},
 			{
 				speaker: 'marketTrader',
 				line: 'Market Trader: Chatty, I saw short merchants with emergency posture near bean sacks marked ordinary.',
-				chatty: 'Chatty: Ordinary bean sacks are now suspicious citizens.'
+				chatty: 'Chatty: Understood. I will check it before I move on.'
 			},
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, the hidden camps are not lost. They are waiting to see if anyone arrives without a leash.',
-				chatty: 'Chatty: I arrive mostly leashless and deeply snack motivated.'
+				chatty: 'Chatty: Right. I will check it before I move on.'
 			}
 		]
 	},
@@ -148,12 +148,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'hiddenGoblinOne',
 				line: 'Hidden Goblin Pip: Chatty, are you tax? You are upright in a very taxable way.',
-				chatty: 'Chatty: I am not tax. I am what tax worries about at night.'
+				chatty: 'Chatty: I can do that. I will check it before I move on.'
 			},
 			{
 				speaker: 'hiddenGoblinOne',
 				line: 'Hidden Goblin Pip: Chatty, say the phrase before I decide your cloak is an ambush.',
-				chatty: 'Chatty: Small does not mean owned.'
+				chatty: 'Chatty: I will remember. I will check it before I move on.'
 			}
 		]
 	},
@@ -163,12 +163,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'bartender',
 				line: 'Bartender: Chatty, make the banner ugly enough that nobody mistakes it for a mayoral program.',
-				chatty: 'Chatty: Ugly means honest. The cloth understands.'
+				chatty: 'Chatty: I understand. I will ask before I act.'
 			},
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, put a bite mark on it so fear knows who signed.',
-				chatty: 'Chatty: Finally, a document I can approve with teeth.'
+				chatty: 'Chatty: Got it. I will ask before I act.'
 			}
 		]
 	},
@@ -178,12 +178,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'stoneGuard',
 				line: 'Stone Guard: Chatty, hold the road and I will pretend this is a very unusual permit inspection.',
-				chatty: 'Chatty: Inspect the hounds first. They look unlawfully bitey.'
+				chatty: 'Chatty: That makes sense. I will ask before I act.'
 			},
 			{
 				speaker: 'marketTrader',
 				line: 'Market Trader: Chatty, supplies are courage with labels. Keep the labels from being eaten.',
-				chatty: 'Chatty: I defend beans, bandages, and the moral arc of inventory.'
+				chatty: 'Chatty: I hear you. I will ask before I act.'
 			}
 		]
 	},
@@ -193,12 +193,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'lanternKeeper',
 				line: 'Lantern Keeper: Chatty, take the lamp. Darkness lies better when nobody can see its face.',
-				chatty: 'Chatty: Good. I prefer my lies visible and frightened.'
+				chatty: 'Chatty: Okay. I will ask before I act.'
 			},
 			{
 				speaker: 'dwarf',
 				line: 'Dwarf Bili: Chatty, the First Name is not treasure. Carry it like someone breathing.',
-				chatty: 'Chatty: I will carry it warm, angry, and not for sale.'
+				chatty: 'Chatty: I agree. I will ask before I act.'
 			}
 		]
 	},
@@ -208,12 +208,12 @@ const SCENE_SCRIPTS = {
 			{
 				speaker: 'mayor',
 				line: 'Mayor Leonard: Chatty, the square is listening. Say freedom like it belongs to everyone here.',
-				chatty: 'Chatty: I am Chatty, the chosen one, because I chose back.'
+				chatty: 'Chatty: Understood. I will ask before I act.'
 			},
 			{
 				speaker: 'hoodedVillager',
 				line: 'Hooded Villager: Chatty, define conquest before the crown defines it for you.',
-				chatty: 'Chatty: We conquer fear. People are not territory.'
+				chatty: 'Chatty: Right. I will ask before I act.'
 			}
 		]
 	}
@@ -259,7 +259,7 @@ function createGeneratedScript(task = {}, phase = {}) {
 	const character = getCharacter(speaker)
 	const displayName = character.displayName
 	const hint = sentence(task.hint || task.detail || task.title)
-	const reply = `Chatty: Then ${lowerFirst(task.title || 'the next problem')} becomes public trouble.`
+	const reply = `Chatty: I understand. I will handle ${lowerFirst(task.title || 'the next step')} carefully.`
 	return {
 		id: task.id,
 		generated: true,
@@ -289,39 +289,39 @@ STORY_PHASES.forEach(phase => {
 
 const CHATTY_NARRATION = {
 	travel: [
-		'I keep the cloak low and my ears open.',
-		'I leave the familiar steps behind and test new ground.',
-		'I follow the next useful lead with suspicious feet.'
+		'I should keep moving and pay attention.',
+		'I need to find the next useful person or place.',
+		'I will try a new path and see what changes.'
 	],
 	listen: [
-		'I plant both feet and let the nearby voice become useful.',
-		'I stop walking because the nearby voice might know something.',
-		'I listen like a goblin pretending this was the plan.'
+		'I should listen before I answer.',
+		'I need to understand what they are asking for.',
+		'I will hear them out and then decide.'
 	],
 	inspect: [
-		'I study the clue with both suspicious eyes.',
-		'I lean close enough for the world to become evidence.',
-		'I check the thing before the thing checks back.'
+		'I should look closely before I touch anything.',
+		'I need proof before I guess.',
+		'I will check the clue and keep it simple.'
 	],
 	combat: [
-		'I square the cloak and choose trouble on purpose.',
-		'I watch the enemy for the part that wants to lose.',
-		'I bring small historic inconvenience to the fight.'
+		'I need to stay calm and watch the enemy.',
+		'I should protect myself before I strike.',
+		'I will use the safest attack that works.'
 	],
 	discovery: [
-		'I find a clue and pocket the useful edge.',
-		'I notice the world admitting something it tried to hide.',
-		'I turn the clue over until it becomes trouble for someone else.'
+		'I found something useful.',
+		'I should remember this and use it soon.',
+		'I need to connect this clue to the next step.'
 	],
 	victory: [
-		'I survive, which remains the rudest answer to old fear.',
-		'I keep the cloak and the road keeps its witness.',
-		'I win a small piece of tomorrow back.'
+		'I made it through that.',
+		'I should recover and keep going.',
+		'I can use this win to help the next step.'
 	],
 	failure: [
-		'I check the cloak, swallow the mistake, and try again.',
-		'I refuse to let one bad step become a law.',
-		'I survive the embarrassment and keep moving.'
+		'I made a mistake. I need to adjust.',
+		'I should try a safer option.',
+		'I can recover from this and keep going.'
 	]
 }
 
@@ -511,13 +511,13 @@ function getChattyFallbackNarration(snapshot = {}, action = 'move', details = {}
 	const questId = normalizeQuestId(scene.questId || details.questId || '')
 	const targetName = String(details.routeTargetName || details.targetName || '').toLowerCase()
 	if (action === 'move' && (questId.includes('find-voice') || targetName.includes('bartender') || targetName.includes('tavern'))) {
-		return 'I pad toward the tavern, cloak low and ears open.'
+		return 'I need to reach the tavern and ask what is going on.'
 	}
 	if (action === 'move' && (questId.includes('ledger') || targetName.includes('ledger'))) {
-		return 'I follow the smell of old paper and refuse to be impressed by doors.'
+		return 'I need to find the ledger and understand who it hurt.'
 	}
 	if (action === 'move' && (questId.includes('hidden-camp') || targetName.includes('camp'))) {
-		return 'I follow the lantern road past the point where sensible people stop.'
+		return 'I need to find the hidden camp and talk to the goblins there.'
 	}
 	const poolKey = getNarrationPool(snapshot, action)
 	const pool = CHATTY_NARRATION[poolKey] || CHATTY_NARRATION.travel

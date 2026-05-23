@@ -51,7 +51,7 @@
 						<div ref="terminal" class="gw-window__body gw-term__body gw-term__body--scroll">
 							<p v-if="!feedEvents.length" class="gw-term__line gw-term__line--cursor">
 								<span class="gw-term__prompt">&gt;</span>
-								<span>waiting for events</span>
+								<span>{{ feedPlaceholderText }}</span>
 								<span class="gw-blink">_</span>
 							</p>
 							<p v-for="event in feedEvents" :key="event.id" :class="['gw-feed-line', 'gw-feed-line--' + event.tone]">
@@ -215,6 +215,14 @@ export default {
 				const recent = entries.slice(Math.max(0, index - 8), index)
 				return !recent.some(previous => previous.speaker === entry.speaker && previous.text.toLowerCase().replace(/\s+/g, ' ') === entry.text.toLowerCase().replace(/\s+/g, ' '))
 			})
+		},
+		feedStatus() {
+			return this.snapshot && this.snapshot.feedStatus ? this.snapshot.feedStatus : {}
+		},
+		feedPlaceholderText() {
+			if (!this.snapshot) return 'connecting to live feed'
+			if (this.feedStatus.feedStarved) return 'Chatty is moving. Conversation will appear here.'
+			return 'listening for Chatty and nearby voices'
 		},
 		questTasks() {
 			return this.quests

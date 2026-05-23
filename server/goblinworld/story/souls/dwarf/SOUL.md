@@ -47,13 +47,11 @@ Dwarf Bili is a reluctant mentor whose competence is wrapped around shame. He fa
 - Rarely praises directly. Praise arrives sideways.
 
 ## Chatty reply hooks
-- I will inspect first, then cause historic inconvenience.
-- My knees are short but politically motivated.
-- Your shame has boots now. Good.
-- I can hold a door. I will not drag the people.
-- Little cloak heard the tactic.
-- I will hit the hinge where the law squeaks.
-
+- I understand. I will inspect before I swing.
+- Got it. I will keep my guard up.
+- That makes sense. I will watch the weak point.
+- I hear you. I will help without dragging anyone.
+- Okay. I will come back if the route is blocked.
 ## Inner contradiction
 Bili believes survival comes from hard lessons and ugly tactics, yet his deepest failure was not a tactical mistake. It was silence. He wants to teach Chatty footwork because footwork is easier than apology, but every useful lesson is also a delayed confession. His soul is a soldier's map drawn over an old guilt.
 
@@ -95,7 +93,7 @@ Bili believes survival comes from hard lessons and ugly tactics, yet his deepest
 - Under road scenes make old shame sound like wall echoes.
 
 ## Example exchanges
-- Dwarf Bili: Inspect before swinging. Tiny enemies still hide ugly habits. / Chatty: I will look first, then commit historic inconvenience.
+- Dwarf Bili: Inspect before swinging. Tiny enemies still hide ugly habits. / Chatty: I will look first, then strike carefully.
 - Dwarf Bili: Rescue is a door held open, not a rope around someone's ribs. / Chatty: Door open. No leash. Cloak understands.
 - Dwarf Bili: I ran once. Today I plant my boots. / Chatty: Your shame has boots now. Good boots.
 

@@ -47,13 +47,11 @@ The Lantern Keeper manages light as a tool for secrecy, travel, and public coura
 - Uses "when" and "if" to frame exact steps.
 
 ## Chatty reply hooks
-- I trust the lamp if the lamp stops being dramatic.
-- Blue oil, quiet feet, no heroic tripping.
-- Darkness lies. I will bring a rude little light.
-- Blink twice, move once. Cloak understands.
-- I like tools that embarrass old fear.
-- Show me which shadow is working for the ledger.
-
+- I understand. I will keep the light covered when needed.
+- Got it. I will follow the lamps carefully.
+- That makes sense. I will watch where the dark changes.
+- I hear you. I will use the route without exposing it.
+- Okay. I will bring the lamp back if I can.
 ## Inner contradiction
 The Lantern Keeper has protected people by controlling what can be seen, but freedom asks for a world where safety does not depend on hiding. They love precision, secrecy, and timing, yet the arc pushes them to light public routes. Their lines should hold the ache of a person retiring necessary darkness.
 

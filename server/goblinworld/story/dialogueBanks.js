@@ -380,10 +380,10 @@ const PUBLIC_RATIONALES = [
 ]
 
 const CHATTY_COMBAT_LINES = [
-	'I swing with historic inconvenience.',
-	'Your knees have entered negotiations.',
+	'I stay focused and strike carefully.',
+	'I will aim carefully and keep my guard up.',
 	'This cloak has survived soup. It can survive you.',
-	'I am not trapped in here with danger. Danger is briefly sharing a room with destiny.',
+	'I can handle this if I stay calm and choose the right move.',
 	'Victory smells like mud and bad decisions.',
 	'I bite the concept of authority with my whole schedule.',
 	'Small does not mean soft.',
@@ -393,8 +393,8 @@ const CHATTY_COMBAT_LINES = [
 const CHATTY_PUBLIC_LINES = {
 	'phase-1': [
 		'I have fingers. Too many? No, probably enough.',
-		'This cloak accepts me. That is legally a destiny.',
-		'If I am chosen, I choose snacks first.',
+		'This cloak fits, so I need to learn what this body can do.',
+		'If I am chosen, I should start by understanding the town.',
 		'I walk because the floor has challenged me.'
 	],
 	'phase-2': [
@@ -405,8 +405,8 @@ const CHATTY_PUBLIC_LINES = {
 	],
 	'phase-3': [
 		'Diplomacy means I stand near someone until they say useful things.',
-		'Bramble creatures have voted for violence. I respect civic process.',
-		'Allies acquired: one dwarf, two rumors, and a suspicious stick.',
+		'The bramble creatures are blocking the road. I should deal with them.',
+		'I have a dwarf, a few rumors, and enough information to move.',
 		'I am becoming a road problem with witnesses.'
 	],
 	'phase-4': [
@@ -417,12 +417,12 @@ const CHATTY_PUBLIC_LINES = {
 	],
 	'phase-5': [
 		'This banner is tactically ugly. Perfect.',
-		'I conquer this pantry slime in the name of everyone with knees.',
+		'I will clear this pantry slime before it hurts someone.',
 		'Freedom requires cloth, ink, and someone yelling first.',
 		'If a symbol must be tidy, it is probably a receipt.'
 	],
 	'phase-6': [
-		'I did not ask for war. I asked for snacks and basic dignity.',
+		'I did not ask for war. I asked for safety and basic dignity.',
 		'If they wanted peace, they should have made oppression less crunchy.',
 		'The banner is still up. Therefore we are winning.',
 		'I protect the road because the road is learning our names.'

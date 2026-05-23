@@ -3,7 +3,6 @@ const { cloneEncounterView } = require('./encounters')
 const { applyCombatBoardSupport } = require('./encounterDirector')
 const { selectSceneScriptDialogue } = require('./sceneScripts')
 const { getScriptedDialogueLines } = require('./scriptedDialogue')
-const { getCompactNpcSoul } = require('./souls')
 const { uniquePush } = require('./taskRules')
 
 const MAX_SPOKEN_LINES = 2000
@@ -79,14 +78,21 @@ function lineMatchesQuest(line, task, scene) {
 }
 
 function createSoulFollowUp(identity, line, story = {}, turn = 0) {
-	const soul = getCompactNpcSoul(identity.storyKey)
-	const hooks = Array.isArray(soul.chattyReplyHooks) ? soul.chattyReplyHooks.filter(Boolean) : []
-	if (!hooks.length) return null
 	const relationship = story.relationships && story.relationships[identity.storyKey] ? story.relationships[identity.storyKey] : {}
 	const seed = Math.abs((turn || 0) + (relationship.talks || 0) + String(line || '').length)
+	const replies = [
+		'I understand. I will be careful.',
+		'Got it. I will check that next.',
+		'That makes sense. Show me where to look.',
+		'I agree. We should handle this before it gets worse.',
+		'Understood. I will follow up on that.',
+		'Okay. I will keep this simple and do the work.',
+		'I hear you. I will ask before I act.',
+		'Right. I will look for proof first.'
+	]
 	return {
 		actor: CHATTY_NAME,
-		line: `Chatty: ${hooks[seed % hooks.length]}`
+		line: `Chatty: ${replies[seed % replies.length]}`
 	}
 }
 

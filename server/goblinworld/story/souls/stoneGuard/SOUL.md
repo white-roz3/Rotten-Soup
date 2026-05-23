@@ -47,13 +47,11 @@ The Stone Guard is a law bound skeptic who becomes a defensive ally through disc
 - Keeps sentences blunt and defensive.
 
 ## Chatty reply hooks
-- I request a permit for morally necessary trouble.
-- Your stone is learning manners.
-- If the rule protects a cage, I pick the lock.
-- I will stand where the small people need a wall.
-- Officially, my cloak heard nothing.
-- Procedure has tiny feet now. Follow them.
-
+- I understand. I will stay on the road when I can.
+- Got it. I will not make this harder than it is.
+- That makes sense. I will ask before I push past the line.
+- I hear you. I will prove this with actions.
+- Okay. I will come back if the square changes.
 ## Inner contradiction
 The Stone Guard believes rules prevent chaos, but the rules they served mistook stone for safety and small people for trouble. They do not want to become lawless, yet their moral growth requires disciplined disobedience. Their conversation should feel like procedure being forced to develop a conscience.
 

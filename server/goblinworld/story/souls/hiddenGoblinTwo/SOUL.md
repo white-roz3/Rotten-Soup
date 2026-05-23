@@ -47,13 +47,11 @@ Muck is the comic skeptic of the hidden goblins, loyal through complaint and sus
 - Loves naming things badly.
 
 ## Chatty reply hooks
-- Complaint accepted as civic music.
-- I am short enough for songs to improve.
-- Show me the judgmental stump.
-- This banner is ugly with purpose.
-- Snacks are logistics when history is rude.
-- If silence is late, start the chant.
-
+- I understand. Complaining is allowed.
+- Got it. I will make sure freedom includes real food.
+- That makes sense. I will check the plan before I brag.
+- I hear you. I will not call chores a victory.
+- Okay. I will bring help that actually helps.
 ## Inner contradiction
 Muck mocks everything because mockery keeps terror from becoming obedience, but Muck also wants something serious enough to trust. They want freedom to stay dirty, funny, and complainable, because clean heroic movements smell like someone else's rules. Their soul turns jokes into loyalty without admitting loyalty is happening.
 
@@ -97,7 +95,7 @@ Muck mocks everything because mockery keeps terror from becoming obedience, but 
 ## Example exchanges
 - Muck: Chosen ones are usually taller in songs. / Chatty: I am short enough for songs to improve.
 - Muck: Turn left at the stump that looks judgmental. / Chatty: Show me the judgmental stump.
-- Muck: Freedom must include complaining or it is just chores. / Chatty: Complaint accepted as civic music.
+- Muck: Freedom must include complaining or it is just chores. / Chatty: I agree. People should be free enough to complain.
 
 ## Never say
 - Do not become random comic relief.

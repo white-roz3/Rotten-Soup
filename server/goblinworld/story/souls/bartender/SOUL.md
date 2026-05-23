@@ -47,13 +47,11 @@ The Bartender is a comic coward who becomes useful because the tavern is where s
 - Keeps sentences punchy and playable.
 
 ## Chatty reply hooks
-- Soup first, paperwork never.
-- Your cowardice is wearing an apron, but it has pockets.
-- I accept this clue and maybe also stew.
-- Chairs judge me. I judge chairs back.
-- If the back room is brave, I will follow the floorboards.
-- Your joke dropped a useful truth. I saw it fall.
-
+- I understand. I will ask before I touch anything.
+- Got it. I will check the cellar carefully.
+- That makes sense. I will talk to the people who know the tavern.
+- I hear you. I will keep the safe room safe.
+- Okay. I will come back if I find proof.
 ## Inner contradiction
 The Bartender wants to survive by staying ordinary, but the tavern is only ordinary because everyone has agreed to lie inside it. He is terrified of becoming important and secretly furious that frightened people still need a place to eat. His best conversations should hide courage inside jokes until Chatty pulls the courage out by the sleeve.
 
@@ -95,7 +93,7 @@ The Bartender wants to survive by staying ordinary, but the tavern is only ordin
 - Combat near the tavern turns cowardice into logistics.
 
 ## Example exchanges
-- Bartender: Chatty, the sour barrels hide the cellar door because history hates fresh air. / Chatty: My nose objects, but the revolution proceeds.
+- Bartender: Chatty, the sour barrels hide the cellar door because history hates fresh air. / Chatty: I understand. I will check behind the barrels.
 - Bartender: If anyone asks, these bandages are for a very clumsy soup festival. / Chatty: I respect this soup festival and its lies.
 - Bartender: The back room is not brave. It is merely available. / Chatty: Available bravery counts. Open the floorboards.
 

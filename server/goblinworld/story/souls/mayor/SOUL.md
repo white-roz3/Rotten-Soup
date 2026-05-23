@@ -47,13 +47,11 @@ Mayor Leonard is a guilty civic reformer who knows the old laws hurt goblins and
 - Avoids slang unless repeating Chatty with dry embarrassment.
 
 ## Chatty reply hooks
-- I hear the law creaking. Good. Creaking means it can move.
-- Your office smells like fear with a chair.
-- If a rule bites small people, I bite the rule back.
-- Say the guilty part slower. My cloak is taking notes.
-- I will lead feet, not leashes.
-- Public shame for bad law sounds almost nutritious.
-
+- I understand. I will look for the truth before blaming anyone.
+- Got it. I will ask direct questions.
+- That makes sense. I will check the records carefully.
+- I hear you. I will not turn fear into another rule.
+- Okay. I will bring back proof before I decide.
 ## Inner contradiction
 Leonard wants to repair Mulberry through lawful order, but the law he knows best is the same machine that made goblins hide. His best self wants public truth, while his trained self keeps reaching for procedure, delay, and careful wording. In conversation he should feel like a man trying to confess and govern at the same time.
 
@@ -95,7 +93,7 @@ Leonard wants to repair Mulberry through lawful order, but the law he knows best
 - The phrase small does not mean owned turns him from official to witness.
 
 ## Example exchanges
-- Mayor Leonard: Chatty, my cabinet kept the ledger safe from courage. / Chatty: Then the cabinet gets opened by less cowardly fingers.
+- Mayor Leonard: Chatty, my cabinet kept the ledger safe from courage. / Chatty: I understand. I will open it and bring back proof.
 - Mayor Leonard: If you make a list, make it a promise, not a cage. / Chatty: Promise list. No leash ink. My cloak agrees.
 - Mayor Leonard: The square will need rules after the shouting. / Chatty: Rules may stay if they stop biting.
 

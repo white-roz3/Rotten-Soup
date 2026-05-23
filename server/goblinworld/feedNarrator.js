@@ -214,13 +214,13 @@ function isRoutineMovement(event = {}) {
 
 function createFeedEntryForEvent(event = {}) {
 	if (event.feed === null) return null
-	if (shouldHideEvent(event)) return null
 	if (event.feed && typeof event.feed === 'object') {
 		if (event.feed.visible === false) return null
 		const speaker = cleanFeedSpeaker(event.feed.speaker, event)
 		const text = sanitizeText(event.feed.text || event.message, event)
 		if (!text || isBlockedFeedText(text)) return null
 		if (!isAllowedFeedSpeaker(speaker)) return null
+		if (HIDDEN_SYSTEM_EVENT_TYPES.has(event.type)) return null
 		return {
 			visible: true,
 			priority: priorityForEvent(event),
@@ -229,6 +229,7 @@ function createFeedEntryForEvent(event = {}) {
 			text
 		}
 	}
+	if (shouldHideEvent(event)) return null
 	const speakerFromMessage = stripSpeakerPrefix(event.message)
 	const speaker = cleanFeedSpeaker(speakerFromMessage.speaker || visibleSpeaker(event.actor, event), event)
 	const text = sanitizeText(speakerFromMessage.text || event.message, event)
