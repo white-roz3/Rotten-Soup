@@ -4303,14 +4303,18 @@ test('fallback exploration avoids immediate reversal when another route reaches 
 	assert.match(decision.publicRationale, /fresh map space/)
 })
 
-test('live frontend keeps walk timing close to the three second server turn', () => {
+test('live frontend keeps walk timing snappy without changing the server turn', () => {
 	const source = fs.readFileSync(path.join(__dirname, '..', 'src/components/GoblinWorldLive.vue'), 'utf8')
 	const tweenMatch = source.match(/const MOVE_TWEEN_MS = (\d+)/)
 	const staleMatch = source.match(/const MOVEMENT_STALE_MS = (\d+)/)
+	const cameraMatch = source.match(/const CAMERA_TWEEN_MS = (\d+)/)
 
 	assert.ok(tweenMatch, 'MOVE_TWEEN_MS should be explicit')
 	assert.ok(staleMatch, 'MOVEMENT_STALE_MS should be explicit')
-	assert.ok(Number(tweenMatch[1]) >= 3000, 'walk tween should overlap the 3 second server turn')
+	assert.ok(cameraMatch, 'CAMERA_TWEEN_MS should be explicit')
+	assert.ok(Number(tweenMatch[1]) >= 2200, 'walk tween should not make movement look like teleporting')
+	assert.ok(Number(tweenMatch[1]) <= 2600, 'walk tween should finish before the next 3 second server turn')
+	assert.ok(Number(cameraMatch[1]) <= 2600, 'camera should keep up with the faster walk tween')
 	assert.ok(Number(staleMatch[1]) >= 6000, 'walk reset should wait for more than one missed movement event')
 	assert.strictEqual(/if \(delta\.animation === 'walk'\) this\.scheduleAnimationReset/.test(source), false)
 	assert.ok(/movementState/.test(source), 'frontend should use movementState instead of isolated walk events')
