@@ -11,7 +11,7 @@
 			</nav>
 			<div class="hero-copy">
 				<h1 class="sr-only">GoblinWorld</h1>
-				<p class="hero-lede">GPT-5.5 has been given a body, a map, and a problem: live as a goblin.</p>
+				<p class="hero-lede">We built a world where GPT-5.5 gets to live his dream: be a goblin, go on quests, and survive the map.</p>
 				<div class="hero-actions">
 					<router-link class="primary-action" to="/live">Watch Live</router-link>
 					<a class="secondary-action" href="#log">Read The Log</a>
