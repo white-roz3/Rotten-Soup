@@ -30,6 +30,22 @@ function anyRelationshipMeets(story, keys, minimumTrust = 1) {
 	return keys.some(key => (getRelationship(story, key).trust || 0) >= minimumTrust || story.allies.includes(key))
 }
 
+function hasReachedZone(story, task, zone) {
+	const exploration = story.exploration || {}
+	const targetMapId = task && task.target && task.target.mapId ? task.target.mapId : ''
+	const visitedMapZones = exploration.visitedMapZonesThisArc || {}
+	if (targetMapId) {
+		if (visitedMapZones[`${targetMapId}:${zone}`]) return true
+		const visitedMaps = exploration.visitedMapsThisArc || {}
+		const visitedZones = exploration.visitedZonesThisArc || {}
+		return Boolean(visitedMaps[targetMapId] && visitedZones[zone])
+	}
+	const progress = story.visibleProgress || {}
+	const zones = progress.zones || {}
+	const zonesThisArc = exploration.visitedZonesThisArc || {}
+	return progress.lastZone === zone || Boolean(zones[zone]) || Boolean(zonesThisArc[zone])
+}
+
 function predicateMatches(story, task, context = {}) {
 	const predicate = task.predicate || { type: 'auto' }
 	switch (predicate.type) {
@@ -58,14 +74,7 @@ function predicateMatches(story, task, context = {}) {
 		case 'encounterDefeated':
 			return Object.values(story.encounters || {}).some(encounter => encounter.id === predicate.encounterId && encounter.defeated)
 		case 'zoneReached': {
-			if (task.phaseId === 'day-2') {
-				const exploration = story.exploration || {}
-				const zonesThisArc = exploration.visitedZonesThisArc || {}
-				return Boolean(zonesThisArc[predicate.zone])
-			}
-			const progress = story.visibleProgress || {}
-			const zones = progress.zones || {}
-			return progress.lastZone === predicate.zone || Boolean(zones[predicate.zone]) || Boolean(story.facts && story.facts[`reachedZone:${predicate.zone}`])
+			return hasReachedZone(story, task, predicate.zone)
 		}
 		case 'progressAtLeast': {
 			const progress = story.taskProgress || {}

@@ -1,6 +1,12 @@
 const CHATTY_NAME = 'Chatty, the chosen one'
 const INTERACTION_RADIUS = 1
 const MAX_RECOVERY_FAILURES = 3
+const {
+	CANONICAL_CLASSIC_MAP_IDS,
+	createClassicGameRuntime
+} = require('./classicRuntime')
+
+const CLASSIC_RUNTIME = createClassicGameRuntime()
 
 const CARDINAL_STEPS = [
 	{ direction: 'east', x: 1, y: 0 },
@@ -277,6 +283,24 @@ function getTargetMapId(task = {}) {
 	return target.mapId || ''
 }
 
+function getMapRoute(currentMapId = 'mulberryTown', targetMapId = '') {
+	if (!targetMapId || targetMapId === currentMapId) return [currentMapId]
+	if (CANONICAL_CLASSIC_MAP_IDS.includes(currentMapId) && CANONICAL_CLASSIC_MAP_IDS.includes(targetMapId)) {
+		const route = CLASSIC_RUNTIME.findMapRoute(currentMapId, targetMapId)
+		if (route.length) return route
+	}
+	return [currentMapId, targetMapId]
+}
+
+function getPortalRouteTarget(currentMapId, targetMapId) {
+	const mapRoute = getMapRoute(currentMapId, targetMapId)
+	return {
+		finalTargetMapId: targetMapId,
+		mapRoute,
+		nextMapId: mapRoute.length > 1 ? mapRoute[1] : targetMapId
+	}
+}
+
 function getAdjacentWalkableTiles(snapshot, actor) {
 	return CARDINAL_STEPS
 		.map(step => ({ x: actor.x + step.x, y: actor.y + step.y }))
@@ -512,7 +536,8 @@ function resolvePortalRoute(snapshot, task) {
 	const targetMapId = getTargetMapId(task)
 	const currentMapId = getCurrentMapId(snapshot)
 	if (!targetMapId || targetMapId === currentMapId) return null
-	const portals = ((snapshot.map && snapshot.map.portalLinks) || []).filter(link => link.targetMapId === targetMapId)
+	const routeTarget = getPortalRouteTarget(currentMapId, targetMapId)
+	const portals = ((snapshot.map && snapshot.map.portalLinks) || []).filter(link => link.targetMapId === routeTarget.nextMapId)
 	const candidates = portals.map(portal => {
 		const destinations = getPortalDestinations(snapshot, portal)
 		const path = findPath(snapshot, snapshot.goblin.position, destinations)
@@ -532,7 +557,10 @@ function resolvePortalRoute(snapshot, task) {
 			questId: task ? task.id : null,
 			targetTitle: task ? task.title : 'Reach the next map',
 			targetZone: (task && task.target && task.target.zone) || '',
-			targetMapId,
+			targetMapId: routeTarget.nextMapId,
+			finalTargetMapId: routeTarget.finalTargetMapId,
+			nextMapId: routeTarget.nextMapId,
+			mapRoute: routeTarget.mapRoute,
 			targetPortal: portals[0] || null,
 			destinations: [],
 			path: [],
@@ -544,7 +572,7 @@ function resolvePortalRoute(snapshot, task) {
 			unreachableReason: 'portal-unreachable',
 			proxyReached: false,
 			stuck: detectMovementLoop(snapshot),
-			targetReason: `The next objective needs a portal to ${targetMapId}.`,
+			targetReason: `The next objective needs a route through ${routeTarget.nextMapId} toward ${targetMapId}.`,
 			updatedTurn: snapshot.turn || 0
 		}
 	}
@@ -553,7 +581,10 @@ function resolvePortalRoute(snapshot, task) {
 		questId: task ? task.id : null,
 		targetTitle: task ? task.title : 'Reach the next map',
 		targetZone: (task && task.target && task.target.zone) || '',
-		targetMapId,
+		targetMapId: routeTarget.nextMapId,
+		finalTargetMapId: routeTarget.finalTargetMapId,
+		nextMapId: routeTarget.nextMapId,
+		mapRoute: routeTarget.mapRoute,
 		targetPortal: route.portal,
 		destinations: route.destinations,
 		path: route.path,
@@ -565,7 +596,7 @@ function resolvePortalRoute(snapshot, task) {
 		unreachableReason: '',
 		proxyReached: false,
 		stuck: detectMovementLoop(snapshot),
-		targetReason: `${task ? task.title : 'The next objective'} needs the ${route.portal.portalId} portal.`,
+		targetReason: `${task ? task.title : 'The next objective'} needs the ${route.portal.portalId} portal on the way to ${targetMapId}.`,
 		updatedTurn: snapshot.turn || 0
 	}
 }
@@ -632,6 +663,9 @@ function resolveQuestNavigation(snapshot, taskInput) {
 		targetTitle,
 		targetZone,
 		targetMapId: getTargetMapId(task) || getCurrentMapId(snapshot),
+		finalTargetMapId: getTargetMapId(task) || getCurrentMapId(snapshot),
+		nextMapId: '',
+		mapRoute: getTargetMapId(task) ? getMapRoute(getCurrentMapId(snapshot), getTargetMapId(task)) : [getCurrentMapId(snapshot)],
 		targetPortal: null,
 		targetActorId: targetActor ? targetActor.id : null,
 		targetActorName,
@@ -660,6 +694,9 @@ function getNavigationSnapshot(snapshot) {
 		targetTitle: route.targetTitle,
 		targetZone: route.targetZone,
 		targetMapId: route.targetMapId,
+		finalTargetMapId: route.finalTargetMapId,
+		nextMapId: route.nextMapId,
+		mapRoute: route.mapRoute,
 		targetPortal: route.targetPortal,
 		targetActorId: route.targetActorId,
 		targetActorName: route.targetActorName,

@@ -44,6 +44,7 @@ const {
 	getChattyFallbackNarration,
 	getCampaignArcSequence,
 	getNextContinuationArcId,
+	getZoneForPosition,
 	getSceneScriptCoverage,
 	normalizeStoryState,
 	selectStoryNpcDialogueLine,
@@ -464,9 +465,9 @@ test('derives public tasks for the live task panel', () => {
 	assert.deepStrictEqual(tasks.map(task => task.id).slice(0, 5), [
 		'phase-1-test-body',
 		'phase-1-find-voice',
+		'phase-1-scout-forest-road',
 		'phase-1-learn-name',
-		'phase-1-reach-town',
-		'phase-1-first-fight'
+		'phase-1-reach-town'
 	])
 	assert.ok(tasks.length >= 8)
 	assert.strictEqual(tasks[0].status, 'active')
@@ -474,7 +475,7 @@ test('derives public tasks for the live task panel', () => {
 	assert.strictEqual(tasks[0].label, tasks[0].title)
 	assert.match(tasks[0].hint, /Move through safe nearby tiles/)
 	assert.strictEqual(tasks[1].status, 'locked')
-	assert.strictEqual(tasks[4].target.enemy, 'Cellar Rat')
+	assert.strictEqual(tasks[5].target.enemy, 'Cellar Rat')
 })
 
 test('expanded story bible has dense content, recurring arcs, and no dash glyphs', () => {
@@ -735,7 +736,7 @@ test('scene events do not duplicate until the active quest changes', () => {
 	assert.strictEqual(first.events.filter(event => event.type === 'scene').length, 1)
 	assert.strictEqual(second.events.filter(event => event.type === 'scene').length, 0)
 	assert.strictEqual(changed.events.filter(event => event.type === 'scene').length, 1)
-	assert.strictEqual(changed.story.scene.questId, 'phase-1-learn-name')
+	assert.strictEqual(changed.story.scene.questId, 'phase-1-scout-forest-road')
 })
 
 test('optional story tasks can expire without blocking a phase', () => {
@@ -1235,7 +1236,7 @@ test('scene scripts preserve authored beat order instead of letting a later spea
 test('scene scripts cover every main story quest', () => {
 	const coverage = getSceneScriptCoverage(STORY_PHASES)
 
-	assert.strictEqual(coverage.taskCount, 64)
+	assert.strictEqual(coverage.taskCount, STORY_PHASES.reduce((total, phase) => total + phase.tasks.length, 0))
 	assert.strictEqual(coverage.missing.length, 0)
 	assert.strictEqual(coverage.scriptedCount, coverage.taskCount)
 })
@@ -1651,6 +1652,40 @@ test('continuation campaign rotates through authored arcs before repeating', () 
 	assert.strictEqual(getNextContinuationArcId(visited[visited.length - 1], visited), sequence[0].id)
 })
 
+test('continuation zone tasks require the correct map, not stale same-named zone facts', () => {
+	const story = normalizeStoryState({
+		day: 2,
+		arcId: 'day-2-road-to-freedom',
+		arcStartedTurn: 0,
+		flags: { dayOneComplete: true, dayTwoAnnounced: true },
+		completedTasks: [
+			'day-2-return-tavern',
+			'day-2-talk-bartender',
+			'day-2-secure-market-road'
+		],
+		facts: {
+			'reachedZone:hidden-camp': true
+		},
+		exploration: {
+			currentMapId: 'mulberryTown',
+			visitedMapsThisArc: { mulberryTown: 120 },
+			visitedZonesThisArc: { 'hidden-camp': 120 },
+			visitedMapZonesThisArc: { 'mulberryTown:hidden-camp': 120 }
+		}
+	}, 120)
+	const result = advanceStoryProgress(story, 121, {
+		map: { id: 'mulberryTown', width: 43, height: 56 },
+		goblin: { position: { x: 5, y: 50 } },
+		actors: [],
+		nearbyActors: [],
+		recentEvents: []
+	})
+
+	assert.strictEqual(result.story.completedTasks.includes('day-2-check-hidden-camp'), false)
+	const active = getStoryTasks(result.story, 121).find(task => task.status === 'active')
+	assert.strictEqual(active.id, 'day-2-check-hidden-camp')
+})
+
 test('live map registry loads registered maps and existing portal links', () => {
 	const ids = getRegisteredMapIds()
 	assert.deepStrictEqual(ids, CANONICAL_CLASSIC_MAP_IDS)
@@ -1669,6 +1704,21 @@ test('live map registry loads registered maps and existing portal links', () => 
 	const links = getPortalLinksForTiledMap(town, 'mulberryTown')
 	assert.ok(links.some(link => link.portalId === 'Mulberry Forest' && link.targetMapId === 'mulberryForest'))
 	assert.ok(links.some(link => link.portalId === 'Mulberry Graveyard' && link.targetMapId === 'mulberryGraveyard'))
+})
+
+test('story zones are scoped to their owning map instead of matching every map center', () => {
+	const townMap = { id: 'mulberryTown', width: 43, height: 56 }
+	const forestMap = { id: 'mulberryForest', width: 60, height: 42 }
+	const graveyardMap = { id: 'mulberryGraveyard', width: 30, height: 30 }
+	const overworldMap = { id: 'overworld', width: 100, height: 60 }
+	const castleMap = { id: 'orcCastle', width: 40, height: 30 }
+
+	assert.notStrictEqual(getZoneForPosition(townMap, { x: 21, y: 28 }).zoneId, 'kingdom-road')
+	assert.notStrictEqual(getZoneForPosition(townMap, { x: 28, y: 0 }).zoneId, 'graveyard')
+	assert.strictEqual(getZoneForPosition(forestMap, { x: 7, y: 31 }).zoneId, 'hidden-camp')
+	assert.strictEqual(getZoneForPosition(graveyardMap, { x: 15, y: 15 }).zoneId, 'graveyard')
+	assert.strictEqual(getZoneForPosition(overworldMap, { x: 50, y: 30 }).zoneId, 'overworld-road')
+	assert.strictEqual(getZoneForPosition(castleMap, { x: 20, y: 15 }).zoneId, 'orc-castle')
 })
 
 test('classic runtime loads every canonical map and resolves every campaign portal', () => {
@@ -1922,6 +1972,7 @@ test('story combat encounter can be resolved by Chatty attack actions', () => {
 				completedTasks: [
 					'phase-1-test-body',
 					'phase-1-find-voice',
+					'phase-1-scout-forest-road',
 					'phase-1-learn-name',
 					'phase-1-reach-town'
 				]
@@ -1960,6 +2011,7 @@ test('encounter spawn creates a public combat board with visible hostile combata
 				completedTasks: [
 					'phase-1-test-body',
 					'phase-1-find-voice',
+					'phase-1-scout-forest-road',
 					'phase-1-learn-name',
 					'phase-1-reach-town'
 				]
@@ -1994,6 +2046,7 @@ test('combat attacks target visible hostiles and remove defeated combatants from
 				completedTasks: [
 					'phase-1-test-body',
 					'phase-1-find-voice',
+					'phase-1-scout-forest-road',
 					'phase-1-learn-name',
 					'phase-1-reach-town'
 				]
@@ -2870,7 +2923,10 @@ test('fallback dialogue requests use first-person Chatty speech instead of refer
 			blocked: []
 		},
 		goblin: { x: 2, y: 2 },
-		story: { phaseId: 'phase-1' }
+		story: {
+			phaseId: 'phase-1',
+			completedTasks: ['phase-1-test-body']
+		}
 	}))
 	const decision = fallbackDecision(world.getSnapshot())
 
@@ -3518,6 +3574,63 @@ test('quest navigation routes to a portal when the target map is not the current
 	assert.match(route.targetReason, /portal/i)
 })
 
+test('quest navigation uses multi-hop portal chains for distant campaign maps', () => {
+	const snapshot = {
+		turn: 21,
+		goblin: { position: { x: 1, y: 1 } },
+		map: {
+			id: 'mulberryTown',
+			name: 'Mulberry Town',
+			width: 10,
+			height: 6,
+			blocked: [],
+			actors: [],
+			portalLinks: [
+				{
+					id: 'portal-forest',
+					portalId: 'Mulberry Forest',
+					targetMapId: 'mulberryForest',
+					x: 6,
+					y: 1
+				},
+				{
+					id: 'portal-graveyard',
+					portalId: 'Mulberry Graveyard',
+					targetMapId: 'mulberryGraveyard',
+					x: 1,
+					y: 5
+				}
+			]
+		},
+		events: [],
+		legalMoves: [
+			{ direction: 'east', x: 2, y: 1 },
+			{ direction: 'south', x: 1, y: 2 }
+		],
+		tasks: [
+			{
+				id: 'day-6-reach-orc-castle',
+				title: 'Reach the orc castle road',
+				status: 'active',
+				target: { kind: 'place', zone: 'orc-castle', mapId: 'orcCastle', name: 'orc castle road' }
+			}
+		],
+		story: {},
+		nearbyActors: [],
+		visibleTiles: [],
+		legalActions: []
+	}
+
+	const route = resolveQuestNavigation(snapshot, snapshot.tasks[0])
+
+	assert.strictEqual(route.finalTargetMapId, 'orcCastle')
+	assert.strictEqual(route.nextMapId, 'mulberryForest')
+	assert.deepStrictEqual(route.mapRoute, ['mulberryTown', 'mulberryForest', 'overworld', 'kingdom', 'orcCastle'])
+	assert.strictEqual(route.targetMapId, 'mulberryForest')
+	assert.strictEqual(route.targetPortal.portalId, 'Mulberry Forest')
+	assert.deepStrictEqual(route.nextStep, { direction: 'east', x: 2, y: 1 })
+})
+
 test('interacting with a reached portal swaps the live map and keeps original map art', () => {
 	const town = loadRegisteredTiledMap(path.join(__dirname, '..'), 'mulberryTown')
 	const world = new GoblinWorld(
@@ -3546,6 +3659,32 @@ test('interacting with a reached portal swaps the live map and keeps original ma
 	assert.strictEqual(event.worldDelta.map.id, 'mulberryForest')
 	assert.strictEqual(event.feed.speaker, 'Chatty')
 	assert.match(event.feed.text, /forest road/)
+})
+
+test('mocked live controller follows the early forest objective through a real portal', () => {
+	const town = loadRegisteredTiledMap(path.join(__dirname, '..'), 'mulberryTown')
+	const world = new GoblinWorld(
+		createWorldFromTiledMap(town, {
+			staticRoot: path.join(__dirname, '..'),
+			mapId: 'mulberryTown',
+			name: 'Mulberry Town'
+		}),
+		{ staticRoot: path.join(__dirname, '..') }
+	)
+	world.state.story.completedTasks = ['phase-1-test-body', 'phase-1-find-voice']
+	world.state.story.relationships.bartender.talks = 1
+	world.advanceStory()
+
+	for (let index = 0; index < 260 && world.getSnapshot().map.id !== 'mulberryForest'; index += 1) {
+		const decision = fallbackDecision(world.getSnapshot(), { controller: 'fallback' })
+		world.applyDecision(decision)
+		world.advanceStory()
+	}
+
+	const snapshot = world.getSnapshot()
+	assert.strictEqual(snapshot.map.id, 'mulberryForest')
+	assert.strictEqual(snapshot.story.exploration.currentMapId, 'mulberryForest')
+	assert.ok(snapshot.story.exploration.visitedMapsThisArc.mulberryForest)
 })
 
 test('quest navigation falls back to a reachable zone waypoint when a target actor is sealed off', () => {
@@ -5273,6 +5412,7 @@ test('scripted hostile combatants keep original tile sprites and no generated sp
 				completedTasks: [
 					'phase-1-test-body',
 					'phase-1-find-voice',
+					'phase-1-scout-forest-road',
 					'phase-1-learn-name',
 					'phase-1-reach-town'
 				]

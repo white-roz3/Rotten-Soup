@@ -33,6 +33,9 @@ function normalizePlan(input = {}, turn = 0) {
 		targetName: plan.targetName || '',
 		targetZone: plan.targetZone || '',
 		targetMapId: plan.targetMapId || '',
+		finalTargetMapId: plan.finalTargetMapId || plan.targetMapId || '',
+		nextMapId: plan.nextMapId || '',
+		mapRoute: Array.isArray(plan.mapRoute) ? plan.mapRoute.slice(0, 10) : [],
 		targetPortal: plan.targetPortal || null,
 		targetActorId: plan.targetActorId || null,
 		targetWaypoint: plan.targetWaypoint || null,
@@ -61,6 +64,9 @@ function compactPlan(planInput = {}) {
 		targetName: plan.targetName,
 		targetZone: plan.targetZone,
 		targetMapId: plan.targetMapId,
+		finalTargetMapId: plan.finalTargetMapId,
+		nextMapId: plan.nextMapId,
+		mapRoute: plan.mapRoute.slice(),
 		targetPortal: plan.targetPortal,
 		targetActorId: plan.targetActorId,
 		targetWaypoint: plan.targetWaypoint,
@@ -148,6 +154,9 @@ function createPlanForTask(task, turn = 0, previous = {}) {
 		targetName: inferTargetName(task),
 		targetZone: inferTargetZone(task),
 		targetMapId: inferTargetMapId(task),
+		finalTargetMapId: inferTargetMapId(task),
+		nextMapId: '',
+		mapRoute: [],
 		targetPortal: null,
 		targetActorId: null,
 		plannedSteps: stepsForTask(task),
@@ -229,6 +238,9 @@ function syncDirectorPlan(story = {}, currentTask = null, context = {}, turn = 0
 		plan.lastPositionKey = key
 	}
 	if (!forcedTaskPlan && isConversationTask(currentTask) && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
+		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount + 1, recoveryIndex: previous.recoveryIndex })
+		changed = true
+	} else if (!forcedTaskPlan && currentTask && inferTargetMapId(currentTask) && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
 		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount + 1, recoveryIndex: previous.recoveryIndex })
 		changed = true
 	} else if (!forcedTaskPlan && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {

@@ -189,15 +189,26 @@ function normalizeExplorationState(input = {}, day = 1, arcId = 'day-1-chatty-aw
 	const exploration = input && typeof input === 'object' && !Array.isArray(input) ? clone(input) : {}
 	const arcVisitKey = `${day}:${arcId}:${arcStartedTurn}`
 	const sameArc = exploration.arcVisitKey === arcVisitKey
+	const visitedZonesThisArc = sameArc && exploration.visitedZonesThisArc && typeof exploration.visitedZonesThisArc === 'object'
+		? { ...exploration.visitedZonesThisArc }
+		: {}
+	const visitedMapZonesThisArc = sameArc && exploration.visitedMapZonesThisArc && typeof exploration.visitedMapZonesThisArc === 'object'
+		? { ...exploration.visitedMapZonesThisArc }
+		: {}
+	if (sameArc && !Object.keys(visitedMapZonesThisArc).length && Object.keys(visitedZonesThisArc).length) {
+		const mapId = exploration.currentMapId || currentMapId || 'mulberryTown'
+		Object.entries(visitedZonesThisArc).forEach(([zoneId, turn]) => {
+			visitedMapZonesThisArc[`${mapId}:${zoneId}`] = turn
+		})
+	}
 	return {
 		currentMapId: exploration.currentMapId || currentMapId || 'mulberryTown',
 		targetMapId: exploration.targetMapId || '',
 		visitedMapsThisArc: sameArc && exploration.visitedMapsThisArc && typeof exploration.visitedMapsThisArc === 'object'
 			? { ...exploration.visitedMapsThisArc }
 			: {},
-		visitedZonesThisArc: sameArc && exploration.visitedZonesThisArc && typeof exploration.visitedZonesThisArc === 'object'
-			? { ...exploration.visitedZonesThisArc }
-			: {},
+		visitedZonesThisArc,
+		visitedMapZonesThisArc,
 		arcVisitKey,
 		lastMapChangeTurn: Number.isInteger(exploration.lastMapChangeTurn) ? exploration.lastMapChangeTurn : 0
 	}
@@ -209,7 +220,7 @@ function normalizeStoryState(input = {}, turn = 0) {
 	const phaseStartedTurn = Number.isInteger(input.phaseStartedTurn)
 		? input.phaseStartedTurn
 		: phase.hourStart * STORY_TURNS_PER_HOUR
-	const facts = normalizeObject(input.facts)
+	let facts = normalizeObject(input.facts)
 	const items = normalizeObject(input.items)
 	const relationships = createDefaultRelationships(input.relationships || {})
 	const encounters = normalizeEncounters(input.encounters)
@@ -229,6 +240,9 @@ function normalizeStoryState(input = {}, turn = 0) {
 		.filter(id => !staleContinuationSave || !String(id).startsWith('day-2-'))
 	const failedTasks = unique(Array.isArray(input.failedTasks) ? input.failedTasks : [])
 		.filter(id => !staleContinuationSave || !String(id).startsWith('day-2-'))
+	if (day >= 2 || staleContinuationSave) {
+		facts = Object.fromEntries(Object.entries(facts).filter(([key]) => !String(key).startsWith('reachedZone:')))
+	}
 
 	return {
 		startedTurn,
@@ -442,9 +456,7 @@ function recordVisiblePosition(story, map, position, turn = 0) {
 	story.exploration.currentMapId = mapId
 	story.exploration.visitedMapsThisArc[mapId] = turn
 	story.exploration.visitedZonesThisArc[zone.zoneId] = turn
-	if (zone.zoneId && zone.zoneId !== 'mulberry') {
-		story.facts[`reachedZone:${zone.zoneId}`] = true
-	}
+	story.exploration.visitedMapZonesThisArc[`${mapId}:${zone.zoneId}`] = turn
 }
 
 function createPhaseBeginEvent(phase) {

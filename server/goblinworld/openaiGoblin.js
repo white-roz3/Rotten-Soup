@@ -26,6 +26,7 @@ const MODEL_SYSTEM_INSTRUCTIONS = [
 ].join(' ')
 const INTERACTION_RADIUS = 1
 const MAX_RECOVERY_FAILURES = 3
+const DIALOGUE_TARGET_KINDS = new Set(['dialogue', 'rumor', 'ally', 'ideology', 'speech', 'goal', 'choice'])
 const CARDINAL_STEPS = [
 	{ direction: 'east', x: 1, y: 0 },
 	{ direction: 'south', x: 0, y: 1 },
@@ -661,6 +662,8 @@ function getDirectTaskDecision(snapshot, task, overrides = {}) {
 			controller: overrides.controller || 'fallback'
 		}
 	}
+	const shouldUseNearbyVoice = Boolean(target.dialog || target.actorId || DIALOGUE_TARGET_KINDS.has(target.kind))
+	if (!shouldUseNearbyVoice) return null
 	const actor = getNearbyDialogueActor(snapshot, task)
 	if (actor) {
 		const actorName = getActorDisplayName(actor)
@@ -686,7 +689,9 @@ function fallbackDecision(snapshot, overrides = {}) {
 
 	const { x, y } = snapshot.goblin.position
 	const plan = snapshot.story && snapshot.story.directorPlan ? snapshot.story.directorPlan : null
-	const usingRecoveryRoute = plan && plan.status === 'recovering' && plan.targetZone && (plan.failureCount || 0) <= MAX_RECOVERY_FAILURES
+	const currentMapId = snapshot.map && snapshot.map.id ? snapshot.map.id : ''
+	const planTargetMapId = plan && (plan.finalTargetMapId || plan.targetMapId)
+	const usingRecoveryRoute = plan && plan.status === 'recovering' && plan.targetZone && (plan.failureCount || 0) <= MAX_RECOVERY_FAILURES && (!planTargetMapId || planTargetMapId === currentMapId)
 	const routeTask = usingRecoveryRoute
 		? {
 			id: plan.questId || 'director-recovery',
@@ -711,6 +716,7 @@ function fallbackDecision(snapshot, overrides = {}) {
 				zone: route.targetZone || routeTarget.zone || null,
 				portalId: route.targetPortal ? route.targetPortal.portalId : null,
 				targetMapId: route.targetMapId || routeTarget.mapId || null,
+				finalTargetMapId: route.finalTargetMapId || routeTarget.mapId || null,
 				reached: true,
 				proxyReached: Boolean(route.proxyReached),
 				questId: routeTask.id

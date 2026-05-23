@@ -46,6 +46,14 @@ const PHASE_BLUEPRINTS = [
 				predicate: { type: 'relationshipTalks', count: 1 },
 				unlocks: ['fact:firstVoice']
 			}),
+			task('phase-1-scout-forest-road', 'Scout the forest road', {
+				target: { kind: 'place', name: 'forest road', zone: 'forest-edge', mapId: 'mulberryForest' },
+				hint: 'Leave town through the forest road and prove the world is bigger than Mulberry.',
+				successLine: 'Chatty reaches the forest road and confirms the map keeps going.',
+				eventType: 'discovery',
+				predicate: { type: 'zoneReached', zone: 'forest-edge' },
+				unlocks: ['fact:forestRoadScouted']
+			}),
 			task('phase-1-learn-name', 'Learn the name Chatty, the chosen one', {
 				target: { kind: 'identity' },
 				hint: 'Listen until someone says the name out loud.',

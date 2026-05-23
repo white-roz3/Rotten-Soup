@@ -10,6 +10,17 @@ const AUTHORED_SCENE_SCRIPTS = {
 			}
 		]
 	},
+	'phase-1-scout-forest-road': {
+		id: 'phase-1-scout-forest-road',
+		participants: ['chatty', 'bartender'],
+		beats: [
+			{
+				speaker: 'bartender',
+				line: 'Bartender: Chatty, the forest road is the east way out. If the town feels too small, prove it.',
+				chatty: 'Chatty: Understood. I will take the forest road and come back with proof.'
+			}
+		]
+	},
 	'phase-1-learn-name': {
 		id: 'phase-1-learn-name',
 		participants: ['chatty', 'mayor'],
@@ -614,6 +625,13 @@ const SCRIPT_FOLLOW_UP_BEATS = {
 			speaker: 'bartender',
 			line: 'Bartender: Chatty, if a step fails, stop, look down, and choose another tile. Prophecy still has to respect floors.',
 			chatty: 'Chatty: I hear you. I will find out what happened.'
+		}
+	],
+	'phase-1-scout-forest-road': [
+		{
+			speaker: 'bartender',
+			line: 'Bartender: Chatty, when the road turns green, keep going until the town stops answering for the whole world.',
+			chatty: 'Chatty: I understand. I will keep going until I reach the forest.'
 		}
 	],
 	'phase-1-learn-name': [
