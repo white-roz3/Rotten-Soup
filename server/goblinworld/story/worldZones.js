@@ -186,10 +186,16 @@ function getZoneLabel(zoneId = '') {
 	return (STORY_ZONES[zoneId] && STORY_ZONES[zoneId].label) || zoneId || 'Mulberry'
 }
 
+function getZoneMapIds(zoneId = '') {
+	const zone = STORY_ZONES[zoneId] || null
+	return zone && Array.isArray(zone.mapIds) ? zone.mapIds.slice() : []
+}
+
 module.exports = {
 	STORY_ZONES,
 	getZoneCenter,
 	getZoneForPosition,
+	getZoneMapIds,
 	getZoneLabel,
 	inferZoneFromText
 }

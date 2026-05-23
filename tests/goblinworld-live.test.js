@@ -3631,6 +3631,31 @@ test('quest navigation uses multi-hop portal chains for distant campaign maps', 
 	assert.deepStrictEqual(route.nextStep, { direction: 'east', x: 2, y: 1 })
 })
 
+test('dialogue quests on another map route back through portals instead of inventing local zones', () => {
+	const forest = loadRegisteredTiledMap(path.join(__dirname, '..'), 'mulberryForest')
+	const world = new GoblinWorld(
+		createWorldFromTiledMap(forest, {
+			staticRoot: path.join(__dirname, '..'),
+			mapId: 'mulberryForest',
+			name: 'Mulberry Forest',
+			goblin: { x: 14, y: 13 }
+		}),
+		{ staticRoot: path.join(__dirname, '..') }
+	)
+	const route = resolveQuestNavigation(world.getSnapshot(), {
+		id: 'phase-1-find-snack-law',
+		title: 'Learn the first town rule about snacks',
+		status: 'active',
+		target: { kind: 'dialogue', dialog: 'BARTENDER' }
+	})
+
+	assert.strictEqual(route.mode, 'portal')
+	assert.strictEqual(route.finalTargetMapId, 'mulberryTown')
+	assert.strictEqual(route.nextMapId, 'mulberryTown')
+	assert.deepStrictEqual(route.mapRoute, ['mulberryForest', 'mulberryTown'])
+	assert.strictEqual(route.targetPortal.targetMapId, 'mulberryTown')
+})
+
 test('interacting with a reached portal swaps the live map and keeps original map art', () => {
 	const town = loadRegisteredTiledMap(path.join(__dirname, '..'), 'mulberryTown')
 	const world = new GoblinWorld(

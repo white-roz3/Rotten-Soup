@@ -1,4 +1,5 @@
 const { getZoneLabel, inferZoneFromText } = require('./worldZones')
+const { inferTaskTargetMapId } = require('./targetMaps')
 
 const RECOVERY_ZONES = [
 	'tavern',
@@ -95,7 +96,7 @@ function inferTargetZone(task = {}) {
 }
 
 function inferTargetMapId(task = {}) {
-	return task && task.target && task.target.mapId ? task.target.mapId : ''
+	return inferTaskTargetMapId(task)
 }
 
 function inferTargetName(task = {}) {
@@ -240,7 +241,7 @@ function syncDirectorPlan(story = {}, currentTask = null, context = {}, turn = 0
 	if (!forcedTaskPlan && isConversationTask(currentTask) && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
 		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount + 1, recoveryIndex: previous.recoveryIndex })
 		changed = true
-	} else if (!forcedTaskPlan && currentTask && inferTargetMapId(currentTask) && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
+	} else if (!forcedTaskPlan && currentTask && inferTargetMapId(currentTask) && context.map && context.map.id && inferTargetMapId(currentTask) !== context.map.id && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {
 		plan = createPlanForTask(currentTask, turn, { ...previous, questId: null, failureCount: previous.failureCount + 1, recoveryIndex: previous.recoveryIndex })
 		changed = true
 	} else if (!forcedTaskPlan && (plan.repeatedPositionTurns >= 6 || turn >= plan.timeoutTurn)) {

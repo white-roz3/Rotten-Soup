@@ -5,6 +5,7 @@ const {
 	CANONICAL_CLASSIC_MAP_IDS,
 	createClassicGameRuntime
 } = require('./classicRuntime')
+const { inferTaskTargetMapId } = require('./story/targetMaps')
 
 const CLASSIC_RUNTIME = createClassicGameRuntime()
 
@@ -279,8 +280,7 @@ function getCurrentMapId(snapshot) {
 }
 
 function getTargetMapId(task = {}) {
-	const target = task.target || {}
-	return target.mapId || ''
+	return inferTaskTargetMapId(task)
 }
 
 function getMapRoute(currentMapId = 'mulberryTown', targetMapId = '') {
@@ -532,8 +532,8 @@ function getPortalDestinations(snapshot, portal) {
 	})
 }
 
-function resolvePortalRoute(snapshot, task) {
-	const targetMapId = getTargetMapId(task)
+function resolvePortalRoute(snapshot, task, options = {}) {
+	const targetMapId = options.targetMapId || getTargetMapId(task)
 	const currentMapId = getCurrentMapId(snapshot)
 	if (!targetMapId || targetMapId === currentMapId) return null
 	const routeTarget = getPortalRouteTarget(currentMapId, targetMapId)
@@ -626,9 +626,14 @@ function resolveActorRoute(snapshot, actors) {
 
 function resolveQuestNavigation(snapshot, taskInput) {
 	const task = getNavigationTask(snapshot, taskInput)
-	const portalRoute = task ? resolvePortalRoute(snapshot, task) : null
-	if (portalRoute) return portalRoute
 	const targetActors = getTaskActors(snapshot, task)
+	const target = task && task.target ? task.target : {}
+	const currentMapId = getCurrentMapId(snapshot)
+	const inferredTargetMapId = getTargetMapId(task)
+	const localTargetMapId = !target.mapId && targetActors.length ? currentMapId : inferredTargetMapId
+	const shouldRouteAcrossMaps = Boolean(task && inferredTargetMapId && inferredTargetMapId !== currentMapId && (target.mapId || !targetActors.length))
+	const portalRoute = shouldRouteAcrossMaps ? resolvePortalRoute(snapshot, task, { targetMapId: inferredTargetMapId }) : null
+	if (portalRoute) return portalRoute
 	const actorRoute = resolveActorRoute(snapshot, targetActors)
 	const targetActor = actorRoute ? actorRoute.actor : null
 	const targetZone = getTargetZone(task, targetActor)
@@ -662,10 +667,10 @@ function resolveQuestNavigation(snapshot, taskInput) {
 		questId: task ? task.id : null,
 		targetTitle,
 		targetZone,
-		targetMapId: getTargetMapId(task) || getCurrentMapId(snapshot),
-		finalTargetMapId: getTargetMapId(task) || getCurrentMapId(snapshot),
+		targetMapId: localTargetMapId || currentMapId,
+		finalTargetMapId: localTargetMapId || currentMapId,
 		nextMapId: '',
-		mapRoute: getTargetMapId(task) ? getMapRoute(getCurrentMapId(snapshot), getTargetMapId(task)) : [getCurrentMapId(snapshot)],
+		mapRoute: localTargetMapId && localTargetMapId !== currentMapId ? getMapRoute(currentMapId, localTargetMapId) : [currentMapId],
 		targetPortal: null,
 		targetActorId: targetActor ? targetActor.id : null,
 		targetActorName,
