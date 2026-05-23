@@ -1,17 +1,3 @@
-FROM node:20.20.2-bookworm-slim AS frontend-build
-
-WORKDIR /app
-ENV NODE_ENV=development
-
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-
-COPY babel.config.js vue.config.js postcss.config.js ./
-COPY public ./public
-COPY src ./src
-
-RUN npm run build
-
 FROM node:20.20.2-bookworm-slim
 
 WORKDIR /app
@@ -23,7 +9,7 @@ COPY server.js ./server.js
 COPY server ./server
 COPY public/maps ./public/maps
 COPY legacy ./legacy
-COPY --from=frontend-build /app/dist ./dist
+COPY railway_dist ./dist
 
 EXPOSE 5000
 

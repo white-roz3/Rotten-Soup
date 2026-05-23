@@ -1865,19 +1865,23 @@ test('classic hostile turns damage adjacent Chatty or move visible hostiles towa
 	assert.strictEqual(classic.actors['hostile-orc'].spriteKey, null)
 })
 
-test('Railway Docker image builds frontend from source instead of stale railway_dist', () => {
+test('Railway Docker image serves the current packaged frontend artifact', () => {
 	const dockerfile = fs.readFileSync(path.join(__dirname, '..', 'Dockerfile'), 'utf8')
 	const dockerignore = fs.readFileSync(path.join(__dirname, '..', '.dockerignore'), 'utf8')
+	const railwayIgnore = fs.readFileSync(path.join(__dirname, '..', '.railwayignore'), 'utf8')
 
-	assert.match(dockerfile, /npm\s+run\s+build/)
+	assert.doesNotMatch(dockerfile, /npm\s+run\s+build/)
 	assert.doesNotMatch(dockerfile, /AS\s+production-deps/)
 	assert.doesNotMatch(dockerfile, /COPY\s+--from=production-deps\s+\/app\/node_modules\s+\.\/node_modules/)
 	assert.match(dockerfile, /npm\s+install\s+--omit=dev\s+--no-audit\s+--no-fund\s+express@4\.16\.4/)
 	assert.doesNotMatch(dockerfile, /npm\s+install\s+express@4\.17\.1/)
-	assert.match(dockerfile, /COPY\s+--from=frontend-build\s+\/app\/dist\s+\.\/dist/)
-	assert.doesNotMatch(dockerfile, /COPY\s+railway_dist\s+\.\/dist/)
+	assert.doesNotMatch(dockerfile, /COPY\s+--from=frontend-build\s+\/app\/dist\s+\.\/dist/)
+	assert.match(dockerfile, /COPY\s+railway_dist\s+\.\/dist/)
 	assert.match(dockerignore, /^dist\/$/m)
-	assert.match(dockerignore, /^railway_dist\/$/m)
+	assert.doesNotMatch(dockerignore, /^railway_dist\/$/m)
+	assert.doesNotMatch(railwayIgnore, /^railway_dist\/$/m)
+	assert.ok(fs.existsSync(path.join(__dirname, '..', 'railway_dist', 'index.html')))
+	assert.ok(fs.existsSync(path.join(__dirname, '..', 'railway_dist', 'BUILD_COMMIT')))
 })
 
 test('Railway healthcheck uses the lightweight health endpoint', () => {
