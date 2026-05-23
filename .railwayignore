@@ -5,7 +5,7 @@
 .env
 .goblinworld
 .goblinworld/
-assets/
+/assets/goblinworld/characters/raw/
 node_modules
 node_modules/
 dist/
