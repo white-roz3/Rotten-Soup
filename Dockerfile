@@ -10,6 +10,7 @@ COPY server ./server
 COPY public/maps ./public/maps
 COPY legacy ./legacy
 COPY railway_dist ./dist
+COPY railway_dist/BUILD_COMMIT ./BUILD_COMMIT
 
 EXPOSE 5000
 
