@@ -1,6 +1,7 @@
 const CHATTY_NAME = 'Chatty, the chosen one'
 const INTERACTION_RADIUS = 1
 const MAX_RECOVERY_FAILURES = 3
+const MAX_PATH_EXPANSIONS = 6000
 const {
 	CANONICAL_CLASSIC_MAP_IDS,
 	createClassicGameRuntime
@@ -307,10 +308,28 @@ function getAdjacentWalkableTiles(snapshot, actor) {
 		.filter(position => isWalkable(snapshot, position, [actor.id]))
 }
 
+function findZoneAnchorActor(snapshot, zone) {
+	const actors = (snapshot.map && snapshot.map.actors) || []
+	return (
+		actors.find(actor => {
+			if (actor.dialog && ACTOR_ZONE_BY_DIALOG[actor.dialog] === zone) return true
+			if (actor.spriteKey && ACTOR_ZONE_BY_SPRITE[actor.spriteKey] === zone) return true
+			return false
+		}) || null
+	)
+}
+
 function zoneCenter(snapshot, zone) {
 	const map = snapshot.map || {}
 	const width = Math.max(1, map.width || 1)
 	const height = Math.max(1, map.height || 1)
+	const anchorActor = findZoneAnchorActor(snapshot, zone)
+	if (anchorActor && Number.isInteger(anchorActor.x) && Number.isInteger(anchorActor.y)) {
+		return {
+			x: Math.max(0, Math.min(width - 1, anchorActor.x)),
+			y: Math.max(0, Math.min(height - 1, anchorActor.y))
+		}
+	}
 	const points = {
 		tavern: { x: Math.floor(width * 0.22), y: Math.floor(height * 0.38) },
 		'mayor-house': { x: Math.floor(width * 0.7), y: Math.floor(height * 0.28) },
@@ -418,22 +437,126 @@ function getNeighbors(snapshot, position) {
 		.filter(candidate => isWalkable(snapshot, candidate))
 }
 
+class MinHeap {
+	constructor() {
+		this.items = []
+	}
+
+	size() {
+		return this.items.length
+	}
+
+	push(key, priority) {
+		const items = this.items
+		items.push({ key, priority })
+		let index = items.length - 1
+		while (index > 0) {
+			const parent = (index - 1) >> 1
+			if (items[parent].priority <= items[index].priority) break
+			const swap = items[parent]
+			items[parent] = items[index]
+			items[index] = swap
+			index = parent
+		}
+	}
+
+	pop() {
+		const items = this.items
+		const top = items[0]
+		const last = items.pop()
+		if (items.length) {
+			items[0] = last
+			let index = 0
+			const length = items.length
+			for (;;) {
+				const left = index * 2 + 1
+				const right = left + 1
+				let smallest = index
+				if (left < length && items[left].priority < items[smallest].priority) smallest = left
+				if (right < length && items[right].priority < items[smallest].priority) smallest = right
+				if (smallest === index) break
+				const swap = items[smallest]
+				items[smallest] = items[index]
+				items[index] = swap
+				index = smallest
+			}
+		}
+		return top.key
+	}
+}
+
+function manhattanToNearest(position, destinations) {
+	let best = Infinity
+	for (const destination of destinations) {
+		const cost = Math.abs(position.x - destination.x) + Math.abs(position.y - destination.y)
+		if (cost < best) best = cost
+	}
+	return best === Infinity ? 0 : best
+}
+
+function buildBlockedLookup(snapshot) {
+	const map = snapshot.map || {}
+	const blocked = new Set()
+	for (const tile of map.blocked || []) {
+		if (Number.isInteger(tile.x) && Number.isInteger(tile.y)) blocked.add(positionKey(tile))
+	}
+	for (const actor of map.actors || []) {
+		if (Number.isInteger(actor.x) && Number.isInteger(actor.y)) blocked.add(positionKey(actor))
+	}
+	return { blocked, width: map.width || 0, height: map.height || 0 }
+}
+
+function reconstructPath(cameFrom, destinationKey, startKey, positionsByKey) {
+	const keys = []
+	let key = destinationKey
+	while (key !== startKey) {
+		keys.push(key)
+		const parent = cameFrom.get(key)
+		if (parent === undefined) break
+		key = parent
+	}
+	keys.reverse()
+	return keys.map(stepKey => positionsByKey.get(stepKey))
+}
+
 function findPath(snapshot, start, destinations) {
 	const normalizedStart = normalizePosition(start)
-	const destinationKeys = new Set((destinations || []).map(positionKey))
-	if (!destinationKeys.size || destinationKeys.has(positionKey(normalizedStart))) return []
-	const queue = [{ position: normalizedStart, path: [] }]
-	const seen = new Set([positionKey(normalizedStart)])
+	const destinationList = (destinations || []).map(position => normalizePosition(position))
+	const destinationKeys = new Set(destinationList.map(positionKey))
+	const startKey = positionKey(normalizedStart)
+	if (!destinationKeys.size || destinationKeys.has(startKey)) return []
 
-	while (queue.length) {
-		const current = queue.shift()
-		for (const next of getNeighbors(snapshot, current.position)) {
-			const key = positionKey(next)
-			if (seen.has(key)) continue
-			const path = current.path.concat(next)
-			if (destinationKeys.has(key)) return path
-			seen.add(key)
-			queue.push({ position: next, path })
+	const { blocked, width, height } = buildBlockedLookup(snapshot)
+	const cameFrom = new Map()
+	const gScore = new Map([[startKey, 0]])
+	const positionsByKey = new Map([[startKey, normalizedStart]])
+	const closed = new Set()
+	const open = new MinHeap()
+	open.push(startKey, manhattanToNearest(normalizedStart, destinationList))
+	let expansions = 0
+
+	while (open.size() && expansions < MAX_PATH_EXPANSIONS) {
+		const currentKey = open.pop()
+		if (closed.has(currentKey)) continue
+		if (destinationKeys.has(currentKey)) return reconstructPath(cameFrom, currentKey, startKey, positionsByKey)
+		closed.add(currentKey)
+		expansions += 1
+		const current = positionsByKey.get(currentKey)
+		const currentG = gScore.get(currentKey)
+		for (const step of CARDINAL_STEPS) {
+			const nextX = current.x + step.x
+			const nextY = current.y + step.y
+			if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
+			const nextKey = `${nextX},${nextY}`
+			if (blocked.has(nextKey) || closed.has(nextKey)) continue
+			const tentativeG = currentG + 1
+			if (tentativeG < (gScore.has(nextKey) ? gScore.get(nextKey) : Infinity)) {
+				const next = { x: nextX, y: nextY }
+				cameFrom.set(nextKey, currentKey)
+				gScore.set(nextKey, tentativeG)
+				positionsByKey.set(nextKey, next)
+				open.push(nextKey, tentativeG + manhattanToNearest(next, destinationList))
+			}
 		}
 	}
 	return []
@@ -484,10 +607,13 @@ function getRecentGoblinPositions(snapshot, limit = 16) {
 	return positions
 }
 
-function detectMovementLoop(snapshot, limit = 8) {
-	const recent = getRecentGoblinPositions(snapshot, limit)
+function detectMovementLoop(snapshot, options = {}) {
+	const window = Number.isInteger(options.window) ? options.window : 12
+	const recent = getRecentGoblinPositions(snapshot, window)
 	if (recent.length < 6) return false
-	return new Set(recent.map(positionKey)).size <= 2
+	const distinct = new Set(recent.map(positionKey)).size
+	const maxDistinct = Number.isInteger(options.maxDistinct) ? options.maxDistinct : Math.max(2, Math.floor(recent.length / 3))
+	return distinct <= maxDistinct
 }
 
 function getRecentPositionScores(snapshot, limit = 24) {
@@ -499,7 +625,52 @@ function getRecentPositionScores(snapshot, limit = 24) {
 	}, {})
 }
 
-function chooseExplorationMove(snapshot) {
+function isCovered(coverage, x, y) {
+	if (!coverage || !coverage.data || !coverage.width) return false
+	if (x < 0 || y < 0 || x >= coverage.width || y >= (coverage.height || 0)) return false
+	return coverage.data[y * coverage.width + x] === 1
+}
+
+function findExplorationStep(snapshot, coverage) {
+	if (!coverage || !coverage.data || !coverage.width) return null
+	const start = normalizePosition(snapshot.goblin && snapshot.goblin.position)
+	const { blocked, width, height } = buildBlockedLookup(snapshot)
+	if (!width || !height) return null
+	const startKey = positionKey(start)
+	const cameFrom = new Map()
+	const positionsByKey = new Map([[startKey, start]])
+	const seen = new Set([startKey])
+	const queue = [start]
+	let head = 0
+	while (head < queue.length) {
+		const current = queue[head]
+		head += 1
+		const currentKey = positionKey(current)
+		for (const step of CARDINAL_STEPS) {
+			const nextX = current.x + step.x
+			const nextY = current.y + step.y
+			if (nextX < 0 || nextY < 0 || nextX >= width || nextY >= height) continue
+			const nextKey = `${nextX},${nextY}`
+			if (seen.has(nextKey) || blocked.has(nextKey)) continue
+			seen.add(nextKey)
+			cameFrom.set(nextKey, currentKey)
+			const next = { x: nextX, y: nextY }
+			positionsByKey.set(nextKey, next)
+			if (!isCovered(coverage, nextX, nextY)) {
+				const path = reconstructPath(cameFrom, nextKey, startKey, positionsByKey)
+				return path.length ? path[0] : null
+			}
+			queue.push(next)
+		}
+	}
+	return null
+}
+
+function chooseExplorationMove(snapshot, coverage = null) {
+	if (coverage) {
+		const frontierStep = findExplorationStep(snapshot, coverage)
+		if (frontierStep) return withDirection(snapshot, frontierStep)
+	}
 	const legalMoves = Array.isArray(snapshot.legalMoves) ? snapshot.legalMoves : []
 	if (!legalMoves.length) return null
 	const recentScores = getRecentPositionScores(snapshot)
@@ -724,6 +895,7 @@ module.exports = {
 	chooseExplorationMove,
 	detectMovementLoop,
 	distance,
+	findExplorationStep,
 	findFirstStepToward,
 	findPath,
 	getAdjacentWalkableTiles,

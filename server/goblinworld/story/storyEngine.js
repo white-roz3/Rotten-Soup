@@ -210,7 +210,8 @@ function normalizeExplorationState(input = {}, day = 1, arcId = 'day-1-chatty-aw
 		visitedZonesThisArc,
 		visitedMapZonesThisArc,
 		arcVisitKey,
-		lastMapChangeTurn: Number.isInteger(exploration.lastMapChangeTurn) ? exploration.lastMapChangeTurn : 0
+		lastMapChangeTurn: Number.isInteger(exploration.lastMapChangeTurn) ? exploration.lastMapChangeTurn : 0,
+		goal: exploration.goal && typeof exploration.goal === 'object' && !Array.isArray(exploration.goal) ? clone(exploration.goal) : null
 	}
 }
 

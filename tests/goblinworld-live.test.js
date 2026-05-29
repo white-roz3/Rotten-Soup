@@ -213,6 +213,7 @@ test('validates a structured goblin decision and strips hidden reasoning fields'
 
 	assert.deepStrictEqual(decision, {
 		action: 'move',
+		goal: { type: null, actorId: null, actorName: null, zone: null, portalId: null, combatAction: null },
 		target: { x: 11, y: 12 },
 		publicRationale: 'The berry scent is strongest east of the well.',
 		goblinUtterance: 'I smell snacks. I proceed with dignity.',
@@ -1270,7 +1271,7 @@ test('every authored scene beat includes a Chatty reply', () => {
 	assert.deepStrictEqual(missing, [])
 })
 
-test('dialogue objectives complete after a natural exchange instead of waiting for every authored script line', () => {
+test('dialogue objectives complete after a natural exchange instead of waiting for every authored script line', async () => {
 	const world = new GoblinWorld(createInitialWorld({
 		map: {
 			name: 'Conversation Gate',
@@ -1308,7 +1309,7 @@ test('dialogue objectives complete after a natural exchange instead of waiting f
 		}
 	}))
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 0,
 		maxNpcSpeechEventsPerTurn: 1
@@ -1349,7 +1350,7 @@ test('authored Chatty replies use plain practical speech instead of forced proph
 	})
 })
 
-test('NPC speaker arbitration follows the next authored beat instead of nearest random participant', () => {
+test('NPC speaker arbitration follows the next authored beat instead of nearest random participant', async () => {
 	const world = new GoblinWorld(createInitialWorld({
 		map: {
 			name: 'Ordered Conversation',
@@ -1409,7 +1410,7 @@ test('NPC speaker arbitration follows the next authored beat instead of nearest 
 	const activeTask = world.getTasks().find(task => task.status === 'active' || task.status === 'combat')
 	assert.strictEqual(activeTask.id, 'phase-2-recover-ledger')
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 3,
 		dialogueCooldownTurns: 0,
 		maxNpcSpeechEventsPerTurn: 1
@@ -1704,6 +1705,24 @@ test('live map registry loads registered maps and existing portal links', () => 
 	const links = getPortalLinksForTiledMap(town, 'mulberryTown')
 	assert.ok(links.some(link => link.portalId === 'Mulberry Forest' && link.targetMapId === 'mulberryForest'))
 	assert.ok(links.some(link => link.portalId === 'Mulberry Graveyard' && link.targetMapId === 'mulberryGraveyard'))
+})
+
+test('live world loads base64-compressed Tiled layers (kingdom) into plain decoded tiles', () => {
+	const kingdom = loadRegisteredTiledMap(path.join(__dirname, '..'), 'kingdom')
+	// kingdom stores its tile layers base64+zlib; decoding must not throw and must match the CSV shape.
+	assert.ok(kingdom.layers.some(layer => layer.type === 'tilelayer' && layer.encoding === 'base64'))
+	const world = new GoblinWorld(createWorldFromTiledMap(kingdom, { mapId: 'kingdom', staticRoot: path.join(__dirname, '..') }))
+	const snapshot = world.getSnapshot()
+	const tileCount = snapshot.map.width * snapshot.map.height
+	assert.ok(snapshot.map.tileLayers.length > 0)
+	for (const layer of snapshot.map.tileLayers) {
+		assert.ok(Array.isArray(layer.data))
+		assert.strictEqual(layer.data.length, tileCount)
+		// Flip/rotation flags must be masked off, so every normalized id stays a small tileset index.
+		assert.ok(layer.data.every(tileId => tileId >= 0 && tileId < 0x10000000))
+	}
+	assert.strictEqual(world.getCoverageStats().total, tileCount)
+	assert.ok(snapshot.map.blocked.length > 0)
 })
 
 test('story zones are scoped to their owning map instead of matching every map center', () => {
@@ -3363,7 +3382,7 @@ test('marks fallback decisions when no model API key is configured', async () =>
 	const world = new GoblinWorld(createInitialWorld({ goblin: { x: 2, y: 2 } }))
 	const decision = await requestGoblinDecision(world.getSnapshot(), { apiKey: '' })
 
-	assert.strictEqual(decision.controller, 'fallback')
+	assert.strictEqual(decision.controller, 'goal-fallback')
 	assert.strictEqual(decision.action, 'move')
 })
 
@@ -3404,10 +3423,10 @@ test('fallback movement heads toward the current quest instead of looping in pla
 	)
 	const decision = await requestGoblinDecision(world.getSnapshot(), { apiKey: '' })
 
-	assert.strictEqual(decision.controller, 'fallback')
+	assert.strictEqual(decision.controller, 'goal-fallback')
 	assert.strictEqual(decision.action, 'move')
 	assert.deepStrictEqual(decision.target, { direction: 'east', x: 3, y: 2 })
-	assert.match(decision.publicRationale, /current quest/)
+	assert.match(decision.publicRationale, /Bartender/)
 })
 
 test('quest navigation resolves a dialogue target and routes around blocked tiles', () => {
@@ -3954,7 +3973,10 @@ test('live story snapshot exposes current quest navigation without raw path spam
 	assert.strictEqual(snapshot.story.navigation.targetZone, 'tavern')
 	assert.deepStrictEqual(snapshot.story.navigation.nextStep, { direction: 'east', x: 3, y: 2 })
 	assert.strictEqual(Object.prototype.hasOwnProperty.call(snapshot.story.navigation, 'path'), false)
-	assert.deepStrictEqual(snapshot.story.navigation, navigation)
+	// story.navigation is getNavigationSnapshot plus a live coverage stat the world injects.
+	const { coverage, ...navigationWithoutCoverage } = snapshot.story.navigation
+	assert.deepStrictEqual(navigationWithoutCoverage, navigation)
+	assert.strictEqual(typeof coverage.ratio, 'number')
 })
 
 test('dialogue quest recovery keeps the authored speaker target', () => {
@@ -4245,7 +4267,7 @@ test('fallback movement follows the navigation route toward a quest actor', () =
 	const decision = fallbackDecision(snapshot)
 
 	assert.strictEqual(decision.action, 'move')
-	assert.deepStrictEqual(decision.target, { direction: 'south', x: 1, y: 2 })
+	assert.deepStrictEqual(decision.target, { direction: 'north', x: 1, y: 0 })
 	assert.match(decision.publicRationale, /Mayor Leonard/)
 	assert.doesNotMatch(decision.publicRationale, /\d+,\d+/)
 })
@@ -4322,9 +4344,17 @@ test('fallback exploration chooses a route toward fresh map space instead of a l
 		{ x: 1, y: 1 },
 		{ x: 2, y: 1 }
 	]
+	// The goblin has paced (0,1)<->(2,1); coverage marks those tiles explored so the frontier router
+	// heads east toward the unexplored corridor end (production always supplies navCoverage via tickGoblin).
+	const coverageWidth = 5
+	const coverageData = new Array(coverageWidth * 3).fill(0)
+	for (const { x, y } of [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }]) {
+		coverageData[y * coverageWidth + x] = 1
+	}
 	const snapshot = {
 		turn: 99,
 		goblin: { position: { x: 1, y: 1 } },
+		navCoverage: { width: coverageWidth, height: 3, data: coverageData },
 		map: {
 			name: 'Doorway Corridor',
 			width: 5,
@@ -4518,6 +4548,7 @@ test('requests Claude Haiku decisions through Anthropic tool use', async () => {
 							name: 'choose_goblin_action',
 							input: {
 								action: 'wait',
+								goal: { goal_type: 'wait', actor_id: null, actor_name: null, zone: null, portal_id: null, combat_action: null },
 								target: { x: null, y: null, id: null, name: null },
 								public_rationale: 'The moss is saying something suspicious.',
 								goblin_utterance: 'I listen with all available ears.',
@@ -4591,7 +4622,7 @@ test('hybrid mode skips model calls between director turns while Chatty keeps mo
 
 	assert.strictEqual(calls, 1)
 	assert.strictEqual(firstEvent.controller, 'anthropic')
-	assert.strictEqual(secondEvent.controller, 'hybrid')
+	assert.strictEqual(secondEvent.controller, 'goal-cadence')
 	assert.strictEqual(secondEvent.action, 'move')
 })
 
@@ -4617,6 +4648,7 @@ test('hybrid mode calls the model immediately for active combat', async () => {
 						name: 'choose_goblin_action',
 						input: {
 							action: 'inspect',
+							goal: { goal_type: 'combat', combat_action: 'inspect', actor_id: null, actor_name: null, zone: null, portal_id: null },
 							target: { enemy: 'Ledger Mite' },
 							public_rationale: 'Combat needs a real decision.',
 							goblin_utterance: 'Show me the weak paper bit.',
@@ -4661,7 +4693,7 @@ test('hybrid mode respects minimum interval for non-combat quest changes', async
 	const decision = await requestGoblinDecision(snapshot, options)
 
 	assert.strictEqual(calls, 0)
-	assert.strictEqual(decision.controller, 'hybrid')
+	assert.strictEqual(decision.controller, 'goal-cadence')
 	assert.strictEqual(decision.action, 'move')
 })
 
@@ -4684,7 +4716,7 @@ test('budget cap forces scripted fallback without calling the model', async () =
 	const status = getControllerStatus(options)
 
 	assert.strictEqual(calls, 0)
-	assert.strictEqual(decision.controller, 'budget-fallback')
+	assert.strictEqual(decision.controller, 'goal-budget')
 	assert.strictEqual(status.mode, 'budget-fallback')
 	assert.strictEqual(status.budget.requestCount, 0)
 })
@@ -4839,7 +4871,7 @@ test('holds position after speaking to a nearby NPC', async () => {
 	assert.match(event.publicRationale, /speaking with Moss Clerk/)
 })
 
-test('nearby NPC initiates dialogue once and then respects cooldown', () => {
+test('nearby NPC initiates dialogue once and then respects cooldown', async () => {
 	const world = new GoblinWorld(
 		createInitialWorld({
 			map: {
@@ -4876,11 +4908,11 @@ test('nearby NPC initiates dialogue once and then respects cooldown', () => {
 		})
 	)
 
-	const firstEvents = world.advanceNpcs({
+	const firstEvents = await world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 6
 	})
-	const secondEvents = world.advanceNpcs({
+	const secondEvents = await world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 6
 	})
@@ -4895,7 +4927,7 @@ test('nearby NPC initiates dialogue once and then respects cooldown', () => {
 	assert.strictEqual(secondEvents.length, 0)
 })
 
-test('fallback NPC dialogue produces a Chatty reply so feed reads as conversation', () => {
+test('fallback NPC dialogue produces a Chatty reply so feed reads as conversation', async () => {
 	const world = new GoblinWorld(
 		createInitialWorld({
 			map: {
@@ -4937,7 +4969,7 @@ test('fallback NPC dialogue produces a Chatty reply so feed reads as conversatio
 		})
 	)
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 6,
 		maxNpcSpeechEventsPerTurn: 1,
@@ -4953,7 +4985,7 @@ test('fallback NPC dialogue produces a Chatty reply so feed reads as conversatio
 	assert.doesNotMatch(dialogue[1].message, /tell Chatty the useful part|I stop and listen|stay put/i)
 })
 
-test('route bridge objectives do not emit random nearby NPC advice as conversation', () => {
+test('route bridge objectives do not emit random nearby NPC advice as conversation', async () => {
 	const phaseOneTaskIds = STORY_PHASES.find(phase => phase.id === 'phase-1').tasks.map(task => task.id)
 	const world = new GoblinWorld(
 		createInitialWorld({
@@ -5009,7 +5041,7 @@ test('route bridge objectives do not emit random nearby NPC advice as conversati
 	assert.strictEqual(activeTask.id, 'phase-1-bridge-objective')
 	assert.strictEqual(activeTask.target.kind, 'route')
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 2,
 		dialogueCooldownTurns: 1,
 		maxNpcSpeechEventsPerTurn: 1
@@ -5033,7 +5065,7 @@ test('routine Chatty movement does not enter the public feed as pseudo conversat
 	assert.strictEqual(event.feed, null)
 })
 
-test('nearby named NPC supports active combat before wandering', () => {
+test('nearby named NPC supports active combat before wandering', async () => {
 	const world = new GoblinWorld(
 		createInitialWorld({
 			map: {
@@ -5083,7 +5115,7 @@ test('nearby named NPC supports active combat before wandering', () => {
 		})
 	)
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 0,
 		maxNpcMovesPerTurn: 1
 	})
@@ -5095,7 +5127,7 @@ test('nearby named NPC supports active combat before wandering', () => {
 	assert.strictEqual(world.getSnapshot().story.dialogue.activeConversation.speakerId, 'stoneGuard')
 })
 
-test('wandering NPC moves one legal step without overlapping the goblin or other actors', () => {
+test('wandering NPC moves one legal step without overlapping the goblin or other actors', async () => {
 	const world = new GoblinWorld(
 		createInitialWorld({
 			map: {
@@ -5138,7 +5170,7 @@ test('wandering NPC moves one legal step without overlapping the goblin or other
 		})
 	)
 
-	const events = world.advanceNpcs({
+	const events = await world.advanceNpcs({
 		dialogueRadius: 0,
 		maxNpcMovesPerTurn: 1,
 		npcHomeRadius: 2,
@@ -5166,7 +5198,7 @@ test('maps old NPC sprite ids to the generated core cast sprite keys', () => {
 	assert.strictEqual(getCharacterSpriteForActor({ entityType: 'CHEST', spriteId: 500 }), null)
 })
 
-test('wandering NPC turn selection rotates so more villagers become active', () => {
+test('wandering NPC turn selection rotates so more villagers become active', async () => {
 	function createRotatingWorld(turn) {
 		return new GoblinWorld(
 			createInitialWorld({
@@ -5194,13 +5226,13 @@ test('wandering NPC turn selection rotates so more villagers become active', () 
 		)
 	}
 
-	const firstActor = createRotatingWorld(1).advanceNpcs({ dialogueRadius: 0, maxNpcMovesPerTurn: 1 })[0].actor
-	const secondActor = createRotatingWorld(2).advanceNpcs({ dialogueRadius: 0, maxNpcMovesPerTurn: 1 })[0].actor
+	const firstActor = (await createRotatingWorld(1).advanceNpcs({ dialogueRadius: 0, maxNpcMovesPerTurn: 1 }))[0].actor
+	const secondActor = (await createRotatingWorld(2).advanceNpcs({ dialogueRadius: 0, maxNpcMovesPerTurn: 1 }))[0].actor
 
 	assert.notStrictEqual(firstActor, secondActor)
 })
 
-test('non-NPC actors neither wander nor speak', () => {
+test('non-NPC actors neither wander nor speak', async () => {
 	const world = new GoblinWorld(
 		createInitialWorld({
 			map: {
@@ -5233,7 +5265,7 @@ test('non-NPC actors neither wander nor speak', () => {
 		})
 	)
 
-	assert.deepStrictEqual(world.advanceNpcs({ dialogueRadius: 3, maxNpcMovesPerTurn: 1 }), [])
+	assert.deepStrictEqual(await world.advanceNpcs({ dialogueRadius: 3, maxNpcMovesPerTurn: 1 }), [])
 	assert.deepStrictEqual(world.getSnapshot().map.actors[0].position || { x: world.getSnapshot().map.actors[0].x, y: world.getSnapshot().map.actors[0].y }, { x: 2, y: 1 })
 })
 
@@ -5290,7 +5322,7 @@ test('does not hold position after interacting with a non-NPC object', async () 
 		dialogueActorRadius: 2
 	})
 
-	assert.strictEqual(event.controller, 'fallback')
+	assert.strictEqual(event.controller, 'goal-fallback')
 	assert.strictEqual(event.action, 'move')
 	assert.notDeepStrictEqual(world.getSnapshot().goblin.position, { x: 2, y: 2 })
 })

@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const zlib = require('zlib')
 const DEFAULT_TILE_SIZE = 32
 const DEFAULT_EVENT_LIMIT = 120
 const DEFAULT_NPC_HOME_RADIUS = 5
@@ -39,7 +40,9 @@ const {
 	SCENE_SCRIPTS,
 	selectStoryNpcDialogueLine
 } = require('./story')
+const { generateChattyReply } = require('./story/modelDialogue')
 const CHATTY_NAME = 'Chatty, the chosen one'
+const DIALOGUE_MEMORY_MAX_BEATS = 8
 const DEFAULT_FACING = 'down'
 const DEFAULT_ANIMATION = 'idle'
 const DEFAULT_MOVEMENT_STATE = 'idle'
@@ -227,6 +230,25 @@ function actorMatchesDialogueTarget(actor, target = {}) {
 	const actorName = String(actor.name || '').toLowerCase()
 	if (targetName && actorName && actorName.includes(targetName)) return true
 	if (targetName && getActorStoryKey(actor).toLowerCase().includes(targetName.replace(/\s+/g, ''))) return true
+	return false
+}
+
+function stripChattyPrefix(line) {
+	return String(line || '')
+		.replace(/^chatty\s*[:\-]\s*/i, '')
+		.trim()
+}
+
+// True when the goblin's persisted goal is to seek out this exact NPC, so the
+// dialogue reply can open the exchange with intent instead of pure proximity.
+function goalTargetsActor(goal, actor) {
+	if (!goal || goal.type !== 'pursue_actor' || !actor) return false
+	if (goal.actorId && actor.id && actor.id === goal.actorId) return true
+	if (goal.actorName) {
+		const want = String(goal.actorName).toLowerCase()
+		const have = String(actor.name || '').toLowerCase()
+		if (have && (have === want || have.includes(want) || want.includes(have))) return true
+	}
 	return false
 }
 
@@ -486,6 +508,40 @@ function normalizeTileId(gid) {
 	return gid > 0 ? gid - 1 : 0
 }
 
+// Tiled stores tile GIDs with the top 4 bits as flip/rotation flags; mask them off
+// so the GID matches the tileset (CSV-encoded maps never set them, base64 ones can).
+const TILED_GID_MASK = 0x0fffffff
+
+function inflateTiledLayer(buffer, compression) {
+	switch (String(compression || '')) {
+		case '':
+			return buffer
+		case 'zlib':
+			return zlib.inflateSync(buffer)
+		case 'gzip':
+			return zlib.gunzipSync(buffer)
+		default:
+			throw new Error(`Unsupported Tiled layer compression: ${compression}`)
+	}
+}
+
+// Tiled tilelayers are either a plain GID array (CSV) or a base64 string of little-endian
+// uint32 GIDs, optionally zlib/gzip compressed. Return a plain GID array either way so the
+// caller can run normalizeTileId identically.
+function decodeTileLayerData(layer) {
+	if (Array.isArray(layer.data)) return layer.data
+	if (layer.encoding === 'base64' && typeof layer.data === 'string') {
+		const raw = inflateTiledLayer(Buffer.from(layer.data, 'base64'), layer.compression)
+		const count = Math.floor(raw.length / 4)
+		const gids = new Array(count)
+		for (let i = 0; i < count; i += 1) {
+			gids[i] = raw.readUInt32LE(i * 4) & TILED_GID_MASK
+		}
+		return gids
+	}
+	throw new Error(`Unsupported Tiled layer encoding "${layer.encoding}" for layer "${layer.name}"`)
+}
+
 function getTiledProperties(properties = []) {
 	return properties.reduce((propertyMap, property) => {
 		propertyMap[property.name] = property.value
@@ -614,7 +670,7 @@ function createWorldFromTiledMap(tiledMap, options = {}) {
 			width: layer.width || tiledMap.width,
 			height: layer.height || tiledMap.height,
 			opacity: layer.opacity === undefined ? 1 : layer.opacity,
-			data: layer.data.map(normalizeTileId)
+			data: decodeTileLayerData(layer).map(normalizeTileId)
 		}))
 	const blocked = createBlockedTilesFromLayers(tiledMap, tileLayers, tilePropertiesById)
 	const actorLayer = tiledMap.layers.find(layer => layer.type === 'objectgroup' && layer.name === 'Actors')
@@ -650,6 +706,8 @@ function createWorldFromTiledMap(tiledMap, options = {}) {
 class GoblinWorld {
 	constructor(initialState = createInitialWorld(), options = {}) {
 		this.staticRoot = options.staticRoot || path.join(__dirname, '..', '..')
+		this.nav = new Map()
+		this.dialogueMemory = new Map()
 		this.state = clone(initialState)
 		this.state.goblin = {
 			...this.state.goblin,
@@ -676,6 +734,8 @@ class GoblinWorld {
 	}
 
 	replaceState(nextState = createInitialWorld()) {
+		this.nav = new Map()
+		this.dialogueMemory = new Map()
 		this.state = clone(nextState)
 		this.state.goblin = {
 			...this.state.goblin,
@@ -720,11 +780,69 @@ class GoblinWorld {
 		}
 		if (snapshot.story) {
 			const navigation = getNavigationSnapshot(snapshot)
+			navigation.coverage = this.getCoverageStats()
 			snapshot.story.navigation = navigation
 			snapshot.story.directorPlan = enrichPlanWithNavigation(snapshot.story.directorPlan, navigation)
 		}
 		snapshot.runtime = getClassicRuntimeSnapshot({ ...snapshot, classic: this.state.classic })
 		return clone(snapshot)
+	}
+
+	getCoverage(mapId, width, height) {
+		const safeWidth = Math.max(1, Number.isInteger(width) ? width : 1)
+		const safeHeight = Math.max(1, Number.isInteger(height) ? height : 1)
+		let entry = this.nav.get(mapId)
+		if (!entry || entry.width !== safeWidth || entry.height !== safeHeight) {
+			entry = { data: new Uint8Array(safeWidth * safeHeight), width: safeWidth, height: safeHeight, exploredCount: 0 }
+			this.nav.set(mapId, entry)
+		}
+		return entry
+	}
+
+	markVisited(position) {
+		const map = this.state.map
+		if (!map || !map.id) return
+		const entry = this.getCoverage(map.id, map.width, map.height)
+		const x = position && Number.isInteger(position.x) ? position.x : null
+		const y = position && Number.isInteger(position.y) ? position.y : null
+		if (x === null || y === null || x < 0 || y < 0 || x >= entry.width || y >= entry.height) return
+		const index = y * entry.width + x
+		if (entry.data[index] === 0) {
+			entry.data[index] = 1
+			entry.exploredCount += 1
+		}
+	}
+
+	getCoverageForCurrentMap() {
+		const map = this.state.map
+		if (!map || !map.id) return null
+		const entry = this.getCoverage(map.id, map.width, map.height)
+		this.markVisited(this.state.goblin.position)
+		return { data: entry.data, width: entry.width, height: entry.height }
+	}
+
+	getCoverageStats() {
+		const map = this.state.map
+		if (!map || !map.id) return { mapId: '', explored: 0, walkable: 0, total: 0, ratio: 0 }
+		const entry = this.getCoverage(map.id, map.width, map.height)
+		const total = entry.width * entry.height
+		const blockedCount = (map.blocked && map.blocked.length) || 0
+		const walkable = Math.max(1, total - blockedCount)
+		return {
+			mapId: map.id,
+			explored: entry.exploredCount,
+			walkable,
+			total,
+			ratio: Math.min(1, Math.round((entry.exploredCount / walkable) * 1000) / 1000)
+		}
+	}
+
+	setExplorationGoal(goal) {
+		if (!this.state.story || typeof this.state.story !== 'object') return
+		if (!this.state.story.exploration || typeof this.state.story.exploration !== 'object') {
+			this.state.story.exploration = {}
+		}
+		this.state.story.exploration.goal = goal && typeof goal === 'object' && !Array.isArray(goal) ? goal : null
 	}
 
 	getPublicStoryDelta() {
@@ -754,7 +872,11 @@ class GoblinWorld {
 	}
 
 	getLegalActions() {
-		return ['move', 'wait', 'interact', 'pick_up', 'pickup', 'attack', 'cast', 'inspect', 'examine', 'climb', 'equip', 'use', 'fire', 'rest', 'flee', 'reposition']
+		const base = ['move', 'wait', 'interact', 'pick_up', 'pickup', 'inspect', 'examine', 'climb', 'equip', 'use', 'rest']
+		if (getActiveStoryEncounter(this.state.story)) {
+			return base.concat(['attack', 'cast', 'fire', 'flee', 'reposition'])
+		}
+		return base
 	}
 
 	isBlocked(position) {
@@ -1088,7 +1210,49 @@ class GoblinWorld {
 		return null
 	}
 
-	advanceNpcs(options = {}) {
+	// Transient, per-NPC running exchange (both sides) used only to feed the
+	// dialogue model coherent turn-taking context. Lives off this.state so it is
+	// never cloned/persisted; resets on restart and on map transition.
+	recordDialogueBeat(actorKey, speaker, line) {
+		if (!actorKey) return
+		const text = speaker === 'chatty' ? stripChattyPrefix(line) : String(line || '').trim()
+		if (!text) return
+		const beats = this.dialogueMemory.get(actorKey) || []
+		beats.push({ speaker, line: text, turn: this.state.turn })
+		this.dialogueMemory.set(actorKey, beats.slice(-DIALOGUE_MEMORY_MAX_BEATS))
+	}
+
+	async resolveChattyReply(actor, storyLine, activeTask, options = {}) {
+		const cannedLine = storyLine.followUp && storyLine.followUp.line ? storyLine.followUp.line : null
+		const actorKey = storyLine.actorKey || getActorStoryKey(actor)
+		const recentExchange = (this.dialogueMemory.get(actorKey) || []).slice()
+		const recentNpcLines = recentExchange.filter(beat => beat.speaker === 'npc').map(beat => beat.line)
+		const goal = this.state.story && this.state.story.exploration ? this.state.story.exploration.goal : null
+		const initiatedByChatty = goalTargetsActor(goal, actor)
+		// Record the NPC line that opened this beat before generating the reply so
+		// recentExchange above stays the prior turns, not a duplicate of npcLine.
+		this.recordDialogueBeat(actorKey, 'npc', storyLine.line)
+		const modelReply = await generateChattyReply({
+			actorKey,
+			npcName: actor.name,
+			npcLine: storyLine.line,
+			recentNpcLines,
+			recentExchange,
+			initiatedByChatty,
+			scene: this.state.story.scene,
+			task: activeTask,
+			options
+		})
+		const reply = modelReply
+			? { line: `Chatty: ${modelReply}`, controller: 'anthropic-dialogue' }
+			: cannedLine
+				? { line: cannedLine, controller: 'story-script' }
+				: null
+		if (reply && reply.line) this.recordDialogueBeat(actorKey, 'chatty', reply.line)
+		return reply
+	}
+
+	async advanceNpcs(options = {}) {
 		const actors = this.state.map.actors || []
 		const dialogueRadius = getNumericOption(options, 'dialogueRadius', DEFAULT_NPC_DIALOGUE_RADIUS)
 		const dialogueCooldownTurns = getNumericOption(options, 'dialogueCooldownTurns', DEFAULT_NPC_DIALOGUE_COOLDOWN_TURNS)
@@ -1157,14 +1321,14 @@ class GoblinWorld {
 				})
 				.slice(0, maxSpeechEvents)
 
-			nearbySpeakers.forEach(actor => {
+			for (const actor of nearbySpeakers) {
 				const storyLine = selectStoryNpcDialogueLine(actor, this.state.story, this.state.turn, {
 					activeTask,
 					scene: this.state.story.scene,
 					allowAmbientDialogue: Boolean(options.allowAmbientNpcDialogue)
 				})
 				this.state.story = storyLine.story
-				if (!storyLine.line) return
+				if (!storyLine.line) continue
 				actor.lastSpeechTurn = this.state.turn
 				actor.facing = getFacingBetween(actor, this.state.goblin.position, actor.facing)
 				actor.animation = DEFAULT_ANIMATION
@@ -1195,10 +1359,11 @@ class GoblinWorld {
 						}
 					}
 				}))
-				if (storyLine.followUp && storyLine.followUp.line) {
+				const chattyReply = await this.resolveChattyReply(actor, storyLine, activeTask, options)
+				if (chattyReply && chattyReply.line) {
 					events.push(this.appendEvent({
 						type: 'dialogue',
-						actor: storyLine.followUp.actor || CHATTY_NAME,
+						actor: CHATTY_NAME,
 						action: 'reply',
 						target: {
 							actor: actor.name,
@@ -1206,9 +1371,9 @@ class GoblinWorld {
 							y: actor.y
 						},
 						position: { ...this.state.goblin.position },
-						message: storyLine.followUp.line,
+						message: chattyReply.line,
 						publicRationale: 'Chatty answers the current scene beat in public.',
-						controller: 'story-script',
+						controller: chattyReply.controller,
 						worldDelta: {
 							goblin: {
 								position: this.state.goblin.position,
@@ -1219,7 +1384,7 @@ class GoblinWorld {
 						}
 					}))
 				}
-			})
+			}
 		}
 
 		if (maxMoves > 0) {
@@ -1335,11 +1500,13 @@ class GoblinWorld {
 		})
 		const returnPortal = getReciprocalPortal(tiledMap, targetMapId, sourceMapId)
 		const spawn = this.findSpawnNearPortal(nextState.map, returnPortal, nextState.goblin.position)
+		this.dialogueMemory.clear()
 		this.state.map = nextState.map
 		this.state.goblin.position = spawn
 		this.state.goblin.facing = DEFAULT_FACING
 		this.state.goblin.animation = DEFAULT_ANIMATION
 		this.state.goblin.movementState = DEFAULT_MOVEMENT_STATE
+		this.markVisited(spawn)
 		if (this.state.story) {
 			this.state.story.exploration = {
 				...(this.state.story.exploration || {}),
@@ -1495,6 +1662,7 @@ class GoblinWorld {
 				})
 			}
 			this.state.goblin.position = target
+			this.markVisited(target)
 			this.state.goblin.facing = facing
 			this.state.goblin.animation = 'walk'
 			this.state.goblin.movementState = 'traveling'

@@ -1,18 +1,26 @@
 const { DEFAULT_GOBLIN_ACTIONS, GOBLIN_DECISION_SCHEMA, validateGoblinDecision } = require('./actionSchema')
 const navigation = require('./navigation')
+const { samePosition, distance, getCurrentTask, getRecentGoblinPositions, getAdjacentWalkableTiles } = navigation
 const { getActorStoryKey, getCompactNpcSoul } = require('./story')
 const { getChattyFallbackNarration } = require('./story/sceneScripts')
+const {
+	DEFAULT_RECOVERY_BACKOFF_MS,
+	getBudgetState,
+	recordModelRequest,
+	recordModelFailure,
+	recordModelUsage,
+	getBudgetLimits,
+	isBudgetExceeded,
+	getBackoffKey,
+	callAnthropicModel
+} = require('./anthropicClient')
 
 const DEFAULT_INTERVAL_MS = 3000
-const DEFAULT_RECOVERY_BACKOFF_MS = 120000
 const DEFAULT_DIALOGUE_HOLD_TURNS = 4
 const DEFAULT_DIALOGUE_ACTOR_RADIUS = 6
 const DEFAULT_AI_MODE = 'hybrid'
 const DEFAULT_MODEL_DIRECTOR_INTERVAL_MS = 45000
 const DEFAULT_MODEL_MIN_INTERVAL_MS = 30000
-const DEFAULT_DAILY_MODEL_REQUEST_CAP = 1200
-const DEFAULT_DAILY_INPUT_TOKEN_CAP = 1000000
-const DEFAULT_DAILY_OUTPUT_TOKEN_CAP = 150000
 const DEFAULT_PROVIDER = 'anthropic'
 const DEFAULT_ANTHROPIC_MODEL = 'claude-haiku-4-5'
 const DEFAULT_OPENAI_MODEL = 'gpt-5.5'
@@ -27,12 +35,6 @@ const MODEL_SYSTEM_INSTRUCTIONS = [
 const INTERACTION_RADIUS = 1
 const MAX_RECOVERY_FAILURES = 3
 const DIALOGUE_TARGET_KINDS = new Set(['dialogue', 'rumor', 'ally', 'ideology', 'speech', 'goal', 'choice'])
-const CARDINAL_STEPS = [
-	{ direction: 'east', x: 1, y: 0 },
-	{ direction: 'south', x: 0, y: 1 },
-	{ direction: 'west', x: -1, y: 0 },
-	{ direction: 'north', x: 0, y: -1 }
-]
 const DECORATIVE_DIALOG_NAMES = new Set(['bar', 'counter', 'table', 'chair', 'bench', 'bed', 'sign', 'chest', 'door'])
 
 function getVisibleWorldSummary(snapshot) {
@@ -224,32 +226,6 @@ function getControllerState(options = {}) {
 	return options.__controllerState
 }
 
-function getTodayKey() {
-	return new Date().toISOString().slice(0, 10)
-}
-
-function getBudgetState(options = {}) {
-	const dayKey = getTodayKey()
-	if (!options.__modelBudget || options.__modelBudget.dayKey !== dayKey) {
-		options.__modelBudget = {
-			dayKey,
-			requestCount: 0,
-			inputTokens: 0,
-			outputTokens: 0,
-			failures: 0
-		}
-	}
-	return options.__modelBudget
-}
-
-function getBudgetLimits(options = {}) {
-	return {
-		requestCap: getNumericOption(options, 'dailyModelRequestCap', 'GOBLINWORLD_DAILY_MODEL_REQUEST_CAP', DEFAULT_DAILY_MODEL_REQUEST_CAP),
-		inputTokenCap: getNumericOption(options, 'dailyInputTokenCap', 'GOBLINWORLD_DAILY_INPUT_TOKEN_CAP', DEFAULT_DAILY_INPUT_TOKEN_CAP),
-		outputTokenCap: getNumericOption(options, 'dailyOutputTokenCap', 'GOBLINWORLD_DAILY_OUTPUT_TOKEN_CAP', DEFAULT_DAILY_OUTPUT_TOKEN_CAP)
-	}
-}
-
 function getPublicBudgetSnapshot(options = {}) {
 	const budget = getBudgetState(options)
 	const limits = getBudgetLimits(options)
@@ -263,14 +239,6 @@ function getPublicBudgetSnapshot(options = {}) {
 		inputTokenCap: limits.inputTokenCap,
 		outputTokenCap: limits.outputTokenCap
 	}
-}
-
-function isBudgetExceeded(options = {}) {
-	const budget = getBudgetState(options)
-	const limits = getBudgetLimits(options)
-	return budget.requestCount >= limits.requestCap ||
-		budget.inputTokens >= limits.inputTokenCap ||
-		budget.outputTokens >= limits.outputTokenCap
 }
 
 function getTurnIntervalMs(options = {}) {
@@ -293,40 +261,12 @@ function getMinTurnGap(options = {}) {
 	return Math.max(1, Math.ceil(getModelMinIntervalMs(options) / getTurnIntervalMs(options)))
 }
 
-function recordModelRequest(options = {}) {
-	const budget = getBudgetState(options)
-	budget.requestCount += 1
-}
-
-function recordModelFailure(options = {}) {
-	const budget = getBudgetState(options)
-	budget.failures += 1
-}
-
-function getUsageNumber(usage, ...keys) {
-	for (const key of keys) {
-		const value = usage && usage[key]
-		if (Number.isFinite(value)) return value
-	}
-	return 0
-}
-
-function recordModelUsage(options = {}, usage = {}) {
-	const budget = getBudgetState(options)
-	budget.inputTokens += getUsageNumber(usage, 'input_tokens', 'inputTokens', 'prompt_tokens', 'promptTokens')
-	budget.outputTokens += getUsageNumber(usage, 'output_tokens', 'outputTokens', 'completion_tokens', 'completionTokens')
-}
-
 function recordSuccessfulModelCall(snapshot, options = {}) {
 	const state = getControllerState(options)
 	const currentTask = getCurrentTask(snapshot)
 	state.lastModelTurn = snapshot.turn
 	state.lastModelTaskId = currentTask ? currentTask.id : null
 	state.lastModelAt = Date.now()
-}
-
-function getBackoffKey(provider) {
-	return `${provider}BackoffUntil`
 }
 
 function getControllerStatus(options = {}) {
@@ -389,57 +329,6 @@ function extractAnthropicDecision(responseJson) {
 		.join('\n')
 		.trim()
 	return text ? JSON.parse(text) : null
-}
-
-function samePosition(a, b) {
-	return a && b && a.x === b.x && a.y === b.y
-}
-
-function positionKey(position) {
-	return `${position.x},${position.y}`
-}
-
-function distance(a, b) {
-	return Math.abs(a.x - b.x) + Math.abs(a.y - b.y)
-}
-
-function getCurrentTask(snapshot) {
-	const tasks = Array.isArray(snapshot.tasks) ? snapshot.tasks : []
-	return tasks.find(task => task.status === 'combat' || task.status === 'active') || null
-}
-
-function getRecentGoblinPositions(snapshot, limit = 16) {
-	const events = Array.isArray(snapshot.events) ? snapshot.events : []
-	const positions = []
-	for (let index = events.length - 1; index >= 0 && positions.length < limit; index -= 1) {
-		const event = events[index]
-		if (event.actor !== CHATTY_NAME || event.action !== 'move') continue
-		const position = event.worldDelta && event.worldDelta.goblin && event.worldDelta.goblin.position
-			? event.worldDelta.goblin.position
-			: event.position
-		if (position && Number.isInteger(position.x) && Number.isInteger(position.y)) {
-			positions.push({ x: position.x, y: position.y })
-		}
-	}
-	return positions
-}
-
-function isInsideMap(snapshot, position) {
-	const map = snapshot.map || {}
-	return position.x >= 0 && position.y >= 0 && position.x < map.width && position.y < map.height
-}
-
-function isBlocked(snapshot, position) {
-	const blockedTiles = (snapshot.map && snapshot.map.blocked) || []
-	return !isInsideMap(snapshot, position) || blockedTiles.some(blocked => samePosition(blocked, position))
-}
-
-function isActorOccupied(snapshot, position) {
-	return ((snapshot.map && snapshot.map.actors) || []).some(actor => samePosition(actor, position))
-}
-
-function isWalkable(snapshot, position) {
-	return !isBlocked(snapshot, position) && !isActorOccupied(snapshot, position)
 }
 
 function getDialogueActors(snapshot) {
@@ -511,124 +400,10 @@ function getNearbyDialogueActor(snapshot, task) {
 		.sort((a, b) => distance(goblin, a) - distance(goblin, b))[0]
 }
 
-function getAdjacentWalkableTiles(snapshot, actor) {
-	return CARDINAL_STEPS
-		.map(step => ({ x: actor.x + step.x, y: actor.y + step.y }))
-		.filter(position => isWalkable(snapshot, position))
-}
-
 function getTaskDestinations(snapshot, task) {
 	return getTaskActors(snapshot, task)
 		.flatMap(actor => getAdjacentWalkableTiles(snapshot, actor))
 		.filter((position, index, list) => list.findIndex(candidate => samePosition(candidate, position)) === index)
-}
-
-function getNeighbors(snapshot, position) {
-	return CARDINAL_STEPS
-		.map(step => ({ x: position.x + step.x, y: position.y + step.y }))
-		.filter(candidate => isWalkable(snapshot, candidate))
-}
-
-function findFirstStepToward(snapshot, destinations) {
-	const start = snapshot.goblin.position
-	const destinationKeys = new Set((destinations || []).map(positionKey))
-	if (!destinationKeys.size || destinationKeys.has(positionKey(start))) return null
-	const queue = [{ position: start, firstStep: null }]
-	const seen = new Set([positionKey(start)])
-
-	while (queue.length) {
-		const current = queue.shift()
-		for (const next of getNeighbors(snapshot, current.position)) {
-			const key = positionKey(next)
-			if (seen.has(key)) continue
-			const firstStep = current.firstStep || next
-			if (destinationKeys.has(key)) return firstStep
-			seen.add(key)
-			queue.push({ position: next, firstStep })
-		}
-	}
-	return null
-}
-
-function getRecentPositionScores(snapshot, limit = 24) {
-	const recent = getRecentGoblinPositions(snapshot, limit)
-	return recent.reduce((counts, position, index) => {
-		const key = positionKey(position)
-		counts[key] = (counts[key] || 0) + Math.max(1, limit - index)
-		return counts
-	}, {})
-}
-
-function findExplorationStepTowardFreshSpace(snapshot) {
-	const start = snapshot.goblin.position
-	const map = snapshot.map || {}
-	if (!Number.isInteger(map.width) || !Number.isInteger(map.height)) return null
-
-	const recentScores = getRecentPositionScores(snapshot)
-	const previousPosition = getRecentGoblinPositions(snapshot, 4)[1]
-	const queue = [{ position: start, firstStep: null, distance: 0 }]
-	const seen = new Set([positionKey(start)])
-	const candidates = []
-
-	while (queue.length) {
-		const current = queue.shift()
-		for (const next of getNeighbors(snapshot, current.position)) {
-			const key = positionKey(next)
-			if (seen.has(key)) continue
-			const firstStep = current.firstStep || next
-			const distanceFromStart = current.distance + 1
-			seen.add(key)
-			queue.push({ position: next, firstStep, distance: distanceFromStart })
-			candidates.push({ position: next, firstStep, distance: distanceFromStart })
-		}
-	}
-
-	if (!candidates.length) return null
-
-	const freshCandidates = candidates.filter(candidate => !recentScores[positionKey(candidate.position)])
-	const nonReversingFreshCandidates = previousPosition
-		? freshCandidates.filter(candidate => !samePosition(candidate.firstStep, previousPosition))
-		: freshCandidates
-	const candidatesToScore = nonReversingFreshCandidates.length ? nonReversingFreshCandidates : candidates
-
-	candidatesToScore.sort((a, b) => {
-		const aKey = positionKey(a.position)
-		const bKey = positionKey(b.position)
-		const aFirstKey = positionKey(a.firstStep)
-		const bFirstKey = positionKey(b.firstStep)
-		const aFresh = recentScores[aKey] ? 0 : 600
-		const bFresh = recentScores[bKey] ? 0 : 600
-		const aBacktrack = previousPosition && samePosition(a.firstStep, previousPosition) ? 8 : 0
-		const bBacktrack = previousPosition && samePosition(b.firstStep, previousPosition) ? 8 : 0
-		const aScore = aFresh + (a.distance * 24) - ((recentScores[aKey] || 0) * 3) - (recentScores[aFirstKey] || 0) - aBacktrack
-		const bScore = bFresh + (b.distance * 24) - ((recentScores[bKey] || 0) * 3) - (recentScores[bFirstKey] || 0) - bBacktrack
-		if (aScore !== bScore) return bScore - aScore
-		if (a.distance !== b.distance) return b.distance - a.distance
-		return `${a.firstStep.x},${a.firstStep.y}`.localeCompare(`${b.firstStep.x},${b.firstStep.y}`)
-	})
-
-	return legalMoveForPosition(snapshot, candidatesToScore[0].firstStep)
-}
-
-function legalMoveForPosition(snapshot, position) {
-	return (snapshot.legalMoves || []).find(move => samePosition(move, position)) || position
-}
-
-function chooseExplorationMove(snapshot) {
-	const legalMoves = Array.isArray(snapshot.legalMoves) ? snapshot.legalMoves : []
-	if (!legalMoves.length) return null
-	const routeStep = findExplorationStepTowardFreshSpace(snapshot)
-	if (routeStep) return routeStep
-	const recentCounts = getRecentPositionScores(snapshot, 8)
-	const previousPosition = getRecentGoblinPositions(snapshot, 4)[1]
-	return legalMoves.slice().sort((a, b) => {
-		const aKey = positionKey(a)
-		const bKey = positionKey(b)
-		const aScore = (recentCounts[aKey] || 0) + (previousPosition && samePosition(a, previousPosition) ? 12 : 0)
-		const bScore = (recentCounts[bKey] || 0) + (previousPosition && samePosition(b, previousPosition) ? 12 : 0)
-		if (aScore !== bScore) return aScore - bScore
-		return `${a.x},${a.y}`.localeCompare(`${b.x},${b.y}`)
-	})[0]
 }
 
 function getCombatFallbackDecision(snapshot, encounter, overrides = {}) {
@@ -733,7 +508,7 @@ function fallbackDecision(snapshot, overrides = {}) {
 	const firstStep = route && route.nextStep ? route.nextStep : null
 	const target = firstStep
 		? firstStep
-		: chooseExplorationMove(snapshot) || navigation.chooseExplorationMove(snapshot) || { x: x + 1, y }
+		: navigation.chooseExplorationMove(snapshot, snapshot.navCoverage) || { x: x + 1, y }
 	const fallbackRationale = firstStep
 		? (usingRecoveryRoute
 			? `Chatty is breaking a route loop by heading toward ${plan.targetName || plan.targetZone}.`
@@ -752,6 +527,252 @@ function fallbackDecision(snapshot, overrides = {}) {
 		memoryUpdate: overrides.memoryUpdate || `Turn ${snapshot.turn}: fallback movement chose ${target.x},${target.y}.`,
 		controller: overrides.controller || 'fallback'
 	}
+}
+
+function findGoalActor(snapshot, goal) {
+	const actors = ((snapshot.nearbyActors || []).concat((snapshot.map && snapshot.map.actors) || [])).filter(actor => actor && actor.name)
+	if (goal.actorId) {
+		const byId = actors.find(actor => actor.id === goal.actorId)
+		if (byId) return byId
+	}
+	if (goal.actorName) {
+		const exact = actors.find(actor => actor.name === goal.actorName)
+		if (exact) return exact
+		const lower = goal.actorName.toLowerCase()
+		return actors.find(actor => actor.name.toLowerCase().includes(lower)) || null
+	}
+	return null
+}
+
+// Resolve a task target to a concrete actor. Unlike findGoalActor (which only
+// knows actorId/actorName), task targets frequently carry only a `dialog` tag
+// (e.g. { kind: 'dialogue', dialog: 'BARTENDER' }), so match on that too.
+function findActorForTarget(snapshot, target) {
+	if (!target) return null
+	const actors = ((snapshot.nearbyActors || []).concat((snapshot.map && snapshot.map.actors) || [])).filter(actor => actor && actor.name)
+	if (target.actorId) {
+		const byId = actors.find(actor => actor.id === target.actorId)
+		if (byId) return byId
+	}
+	if (target.dialog) {
+		const want = String(target.dialog).toUpperCase()
+		const byDialog = actors.find(actor => actor.dialog && String(actor.dialog).toUpperCase() === want)
+		if (byDialog) return byDialog
+	}
+	if (target.name) {
+		const want = String(target.name).toLowerCase()
+		const exact = actors.find(actor => actor.name.toLowerCase() === want)
+		if (exact) return exact
+		return actors.find(actor => actor.name.toLowerCase().includes(want) || want.includes(actor.name.toLowerCase())) || null
+	}
+	return null
+}
+
+function findGoalPortal(snapshot, goal) {
+	const links = (snapshot.map && snapshot.map.portalLinks) || []
+	if (!links.length || !goal.portalId) return null
+	return links.find(link => link.portalId === goal.portalId) || null
+}
+
+function goalDecision(snapshot, fields, overrides = {}) {
+	return {
+		action: fields.action,
+		target: fields.target || {},
+		publicRationale: overrides.publicRationale || fields.publicRationale,
+		goblinUtterance: overrides.goblinUtterance || fields.goblinUtterance,
+		memoryUpdate: overrides.memoryUpdate || fields.memoryUpdate,
+		controller: overrides.controller || 'goal-resolver'
+	}
+}
+
+function goalExploreDecision(snapshot, overrides = {}) {
+	const step = navigation.chooseExplorationMove(snapshot, snapshot.navCoverage)
+	if (!step) {
+		return goalDecision(snapshot, {
+			action: 'wait',
+			target: {},
+			publicRationale: 'Chatty has charted the reachable ground here and waits for a fresh lead.',
+			goblinUtterance: getChattyFallbackNarration(snapshot, 'wait', {}),
+			memoryUpdate: `Turn ${snapshot.turn}: explore goal found no fresh tile, holding.`
+		}, overrides)
+	}
+	return goalDecision(snapshot, {
+		action: 'move',
+		target: step,
+		publicRationale: 'Chatty routes toward unexplored ground to widen the map.',
+		goblinUtterance: getChattyFallbackNarration(snapshot, 'move', { routeTargetName: 'fresh map space' }),
+		memoryUpdate: `Turn ${snapshot.turn}: explore goal stepped to ${step.x},${step.y}.`
+	}, overrides)
+}
+
+function goalMoveDecision(snapshot, step, targetName, overrides = {}) {
+	return goalDecision(snapshot, {
+		action: 'move',
+		target: step,
+		publicRationale: `Chatty advances toward ${targetName}.`,
+		goblinUtterance: getChattyFallbackNarration(snapshot, 'move', { routeTargetName: targetName }),
+		memoryUpdate: `Turn ${snapshot.turn}: goal step toward ${targetName} at ${step.x},${step.y}.`
+	}, overrides)
+}
+
+function resolveGoalToDecision(snapshot, goal, overrides = {}) {
+	const safeGoal = goal || {}
+	const type = safeGoal.type
+
+	if (hasActiveEncounter(snapshot)) {
+		const combatAction = safeGoal.combatAction || (type === 'combat' ? 'attack' : 'inspect')
+		return goalDecision(snapshot, {
+			action: combatAction,
+			target: {},
+			publicRationale: 'An enemy blocks the road, so Chatty answers with a legal combat action.',
+			goblinUtterance: getChattyFallbackNarration(snapshot, combatAction, {}),
+			memoryUpdate: `Turn ${snapshot.turn}: combat goal chose ${combatAction}.`
+		}, overrides)
+	}
+
+	if (type === 'wait') {
+		return goalDecision(snapshot, {
+			action: 'wait',
+			target: {},
+			publicRationale: 'Chatty holds position to let the scene breathe.',
+			goblinUtterance: getChattyFallbackNarration(snapshot, 'wait', {}),
+			memoryUpdate: `Turn ${snapshot.turn}: wait goal.`
+		}, overrides)
+	}
+
+	if (type === 'pursue_actor') {
+		const actor = findGoalActor(snapshot, safeGoal)
+		if (!actor) return goalExploreDecision(snapshot, overrides)
+		const task = { id: 'goal-actor', title: `Reach ${actor.name}`, status: 'active', target: { kind: 'dialogue', name: actor.name, dialog: actor.dialog || undefined } }
+		const route = navigation.resolveQuestNavigation(snapshot, task)
+		if (route.reached) {
+			return goalDecision(snapshot, {
+				action: 'interact',
+				target: { id: actor.id || null, name: actor.name || null, dialog: actor.dialog || null, zone: route.targetZone || null, reached: true },
+				publicRationale: `${actor.name} is close enough to speak with.`,
+				goblinUtterance: getChattyFallbackNarration(snapshot, 'listen', { routeTargetName: actor.name }),
+				memoryUpdate: `Turn ${snapshot.turn}: reached ${actor.name}, opening dialogue.`
+			}, overrides)
+		}
+		if (route.nextStep) return goalMoveDecision(snapshot, route.nextStep, actor.name, overrides)
+		return goalExploreDecision(snapshot, overrides)
+	}
+
+	if (type === 'go_to_zone') {
+		const zone = safeGoal.zone
+		if (!zone) return goalExploreDecision(snapshot, overrides)
+		const task = { id: 'goal-zone', title: `Reach ${zone}`, status: 'active', target: { kind: 'place', zone } }
+		const route = navigation.resolveQuestNavigation(snapshot, task)
+		if (route.nextStep) return goalMoveDecision(snapshot, route.nextStep, route.targetZone || zone, overrides)
+		if (route.reached) {
+			if (route.targetActorId) {
+				const name = route.targetActorName || 'the local'
+				return goalDecision(snapshot, {
+					action: 'interact',
+					target: { id: route.targetActorId, name, zone: route.targetZone || zone, reached: true },
+					publicRationale: `${name} stands in ${route.targetZone || zone}; Chatty speaks.`,
+					goblinUtterance: getChattyFallbackNarration(snapshot, 'listen', { routeTargetName: name }),
+					memoryUpdate: `Turn ${snapshot.turn}: reached zone ${zone}, met ${name}.`
+				}, overrides)
+			}
+			return goalDecision(snapshot, {
+				action: 'wait',
+				target: { zone },
+				publicRationale: `Chatty has reached ${zone} and takes stock.`,
+				goblinUtterance: getChattyFallbackNarration(snapshot, 'wait', { routeTargetName: zone }),
+				memoryUpdate: `Turn ${snapshot.turn}: reached zone ${zone}.`
+			}, overrides)
+		}
+		return goalExploreDecision(snapshot, overrides)
+	}
+
+	if (type === 'take_portal') {
+		const portal = findGoalPortal(snapshot, safeGoal)
+		if (!portal) return goalExploreDecision(snapshot, overrides)
+		const task = { id: 'goal-portal', title: `Take the ${portal.portalId} road`, status: 'active', target: { kind: 'portal', mapId: portal.targetMapId } }
+		const route = navigation.resolveQuestNavigation(snapshot, task)
+		if (route.reached) {
+			const reachedPortal = route.targetPortal || portal
+			return goalDecision(snapshot, {
+				action: 'interact',
+				target: { portalId: reachedPortal.portalId || portal.portalId, targetMapId: reachedPortal.targetMapId || portal.targetMapId, reached: true },
+				publicRationale: `Chatty steps onto the ${portal.portalId} road.`,
+				goblinUtterance: `The ${portal.portalId} road is right here, so I take it.`,
+				memoryUpdate: `Turn ${snapshot.turn}: took portal ${portal.portalId} -> ${portal.targetMapId}.`
+			}, overrides)
+		}
+		if (route.nextStep) return goalMoveDecision(snapshot, route.nextStep, `the ${portal.portalId} road`, overrides)
+		return goalExploreDecision(snapshot, overrides)
+	}
+
+	return goalExploreDecision(snapshot, overrides)
+}
+
+function fullGoal(partial = {}) {
+	return {
+		type: partial.type || null,
+		actorId: partial.actorId || null,
+		actorName: partial.actorName || null,
+		zone: partial.zone || null,
+		portalId: partial.portalId || null,
+		combatAction: partial.combatAction || null
+	}
+}
+
+function getPersistedGoal(snapshot) {
+	const goal = snapshot && snapshot.story && snapshot.story.exploration && snapshot.story.exploration.goal
+	return goal && typeof goal === 'object' && goal.type ? goal : null
+}
+
+// A goal is "valid" when its target still exists on the current map and is worth resolving.
+// Whether the goal is reached is decided by the resolver (reached -> terminal interact), so it is
+// not computed here; the gate keeps resolving a valid goal until it stalls into a wait.
+function isGoalValid(snapshot, goal) {
+	if (!goal || !goal.type) return false
+	if (hasActiveEncounter(snapshot)) return goal.type === 'combat'
+	if (goal.type === 'combat') return false
+	if (goal.type === 'wait') return true
+	if (goal.type === 'explore') return true
+	if (goal.type === 'pursue_actor') return Boolean(findGoalActor(snapshot, goal))
+	if (goal.type === 'go_to_zone') return Boolean(goal.zone)
+	if (goal.type === 'take_portal') return Boolean(findGoalPortal(snapshot, goal))
+	return false
+}
+
+function deriveDefaultGoal(snapshot) {
+	if (hasActiveEncounter(snapshot)) return fullGoal({ type: 'combat', combatAction: 'attack' })
+	const task = getCurrentTask(snapshot)
+	const target = task && task.target ? task.target : null
+	if (target) {
+		if (target.dialog || target.actorId || DIALOGUE_TARGET_KINDS.has(target.kind)) {
+			const actor = findActorForTarget(snapshot, target)
+			if (actor) return fullGoal({ type: 'pursue_actor', actorId: actor.id || null, actorName: actor.name || null })
+			return fullGoal({ type: 'explore' })
+		}
+		if (target.kind === 'portal') {
+			const links = (snapshot.map && snapshot.map.portalLinks) || []
+			const link = links.find(entry => entry.targetMapId === target.mapId) || links[0]
+			if (link) return fullGoal({ type: 'take_portal', portalId: link.portalId })
+			return fullGoal({ type: 'explore' })
+		}
+		if (target.zone) {
+			const route = navigation.resolveQuestNavigation(snapshot, {
+				id: 'derive-zone',
+				title: `Reach ${target.zone}`,
+				status: 'active',
+				target: { kind: 'place', zone: target.zone }
+			})
+			if (route.reached && !route.targetActorId) return fullGoal({ type: 'explore' })
+			return fullGoal({ type: 'go_to_zone', zone: target.zone })
+		}
+	}
+	return fullGoal({ type: 'explore' })
+}
+
+function resolveGoalDecision(snapshot, goal, overrides = {}) {
+	const decision = resolveGoalToDecision(snapshot, goal, overrides)
+	decision.goal = goal
+	return decision
 }
 
 function getNumericOption(options, optionName, envName, fallback) {
@@ -856,10 +877,7 @@ function getLatestEventAfterTurn(snapshot, predicate, turn) {
 }
 
 function isLikelyStuck(snapshot) {
-	const recent = getRecentGoblinPositions(snapshot, 8)
-	if (recent.length < 6) return false
-	const unique = new Set(recent.map(positionKey))
-	return unique.size <= 2
+	return navigation.detectMovementLoop(snapshot)
 }
 
 function shouldCallModelNow(snapshot, options = {}) {
@@ -885,40 +903,61 @@ function shouldCallModelNow(snapshot, options = {}) {
 	return { call: false, reason: 'cadence' }
 }
 
-function hybridFallbackDecision(snapshot, reason) {
-	const currentTask = getCurrentTask(snapshot)
-	return fallbackDecision(snapshot, {
-		controller: reason === 'budget' ? 'budget-fallback' : 'hybrid',
-		publicRationale: currentTask
-			? `The current quest already points toward ${currentTask.title}, so Chatty keeps following it.`
-			: 'The road is clear enough for Chatty to keep scouting new ground.',
-		goblinUtterance: currentTask
-			? getChattyFallbackNarration(snapshot, 'move', { questId: currentTask.id, routeTargetName: currentTask.title })
-			: getChattyFallbackNarration(snapshot, 'move', { routeTargetName: 'fresh map space' })
-	})
-}
-
 async function requestGoblinDecision(snapshot, options = {}) {
 	const provider = getModelProvider(options)
 	const apiKey = getProviderApiKey(provider, options)
-	if (!apiKey) return fallbackDecision(snapshot)
-	if (getAiMode(options) === 'fallback') return fallbackDecision(snapshot)
-	if (isBudgetExceeded(options)) return hybridFallbackDecision(snapshot, 'budget')
+	const mode = getAiMode(options)
 	const backoffKey = getBackoffKey(provider)
-	if (options[backoffKey] && Date.now() < options[backoffKey]) {
-		return fallbackDecision(snapshot, {
-			controller: `${provider}-recovery`,
-			publicRationale: 'The road is still readable, so Chatty keeps moving through the current story.',
-			goblinUtterance: 'The road still has answers, so I keep the cloak moving.',
-			memoryUpdate: `Turn ${snapshot.turn}: controller cooldown, deterministic movement continued.`
+	const inBackoff = Boolean(options[backoffKey] && Date.now() < options[backoffKey])
+	const budgetExceeded = isBudgetExceeded(options)
+	const modelAvailable = Boolean(apiKey) && mode !== 'fallback' && !budgetExceeded && !inBackoff
+
+	const persistedGoal = getPersistedGoal(snapshot)
+	const persistedValid = isGoalValid(snapshot, persistedGoal)
+	const gate = shouldCallModelNow(snapshot, options)
+
+	// (Re)select a goal with the model when it is allowed and the gate says it is time
+	// (initial / combat / quest / phase / dialogue / stuck / director cadence).
+	if (modelAvailable && gate.call) {
+		const modelDecision =
+			provider === 'openai' ? await requestOpenAIDecision(snapshot, apiKey, options) : await requestAnthropicDecision(snapshot, apiKey, options)
+		const goal = modelDecision && modelDecision.goal && modelDecision.goal.type ? fullGoal(modelDecision.goal) : deriveDefaultGoal(snapshot)
+		return resolveGoalDecision(snapshot, goal, {
+			controller: (modelDecision && modelDecision.controller) || `${provider}-goal`,
+			publicRationale: modelDecision && modelDecision.publicRationale,
+			goblinUtterance: modelDecision && modelDecision.goblinUtterance,
+			memoryUpdate: modelDecision && modelDecision.memoryUpdate
 		})
 	}
 
-	const eligibility = shouldCallModelNow(snapshot, options)
-	if (!eligibility.call) return hybridFallbackDecision(snapshot, eligibility.reason)
+	// No model this tick: keep resolving the active goal deterministically only while it still makes
+	// forward progress (a move). The moment it reaches its target (a terminal interact/combat action) or
+	// stalls (wait), abandon it and re-derive a fresh goal from the current task — otherwise a *reached*
+	// pursue/zone goal stays "valid" and loops on interact forever, pinning the goblin at the first NPC
+	// it meets instead of advancing to the next objective.
+	if (persistedGoal && persistedValid) {
+		const probe = resolveGoalToDecision(snapshot, persistedGoal, { controller: 'goal-cadence' })
+		if (probe.action === 'move') {
+			probe.goal = persistedGoal
+			return probe
+		}
+	}
 
-	if (provider === 'openai') return requestOpenAIDecision(snapshot, apiKey, options)
-	return requestAnthropicDecision(snapshot, apiKey, options)
+	const goal = deriveDefaultGoal(snapshot)
+	const controller = budgetExceeded ? 'goal-budget' : inBackoff ? 'goal-recovery' : mode === 'fallback' || !apiKey ? 'goal-fallback' : 'goal-cadence'
+	return resolveGoalDecision(snapshot, goal, { controller })
+}
+
+function resolveLegalActions(snapshot) {
+	return Array.isArray(snapshot.legalActions) && snapshot.legalActions.length ? snapshot.legalActions : DEFAULT_GOBLIN_ACTIONS
+}
+
+// The model's top-level action is advisory now — the goal resolver picks the executed action — so an
+// out-of-context action (e.g. attack with no encounter) must not crash goal selection. Coerce it to a
+// universally-legal 'wait' before validation; the resolver overrides it from the chosen goal anyway.
+function coerceAdvisoryAction(rawDecision, legalActions) {
+	const action = String(rawDecision && rawDecision.action ? rawDecision.action : '').replace(/\s+/g, ' ').trim()
+	if (!legalActions.includes(action)) rawDecision.action = 'wait'
 }
 
 async function requestOpenAIDecision(snapshot, apiKey, options = {}) {
@@ -972,20 +1011,19 @@ async function requestOpenAIDecision(snapshot, apiKey, options = {}) {
 	const text = extractResponseText(responseJson)
 	const rawDecision = JSON.parse(text)
 	recordSuccessfulModelCall(snapshot, options)
+	const legalActions = resolveLegalActions(snapshot)
+	coerceAdvisoryAction(rawDecision, legalActions)
 	return {
-		...validateGoblinDecision(rawDecision, DEFAULT_GOBLIN_ACTIONS),
+		...validateGoblinDecision(rawDecision, legalActions),
 		controller: 'openai'
 	}
 }
 
 async function requestAnthropicDecision(snapshot, apiKey, options = {}) {
-	const model = getProviderModel('anthropic', options)
 	const visibleWorld = getVisibleWorldSummary(snapshot)
-	const httpFetch = options.fetch || fetch
-	const requestBody = JSON.stringify({
-		model,
-		max_tokens: 700,
-		temperature: 0.7,
+	const responseJson = await callAnthropicModel({
+		apiKey,
+		model: getProviderModel('anthropic', options),
 		system: MODEL_SYSTEM_INSTRUCTIONS,
 		messages: [
 			{
@@ -1000,49 +1038,32 @@ async function requestAnthropicDecision(snapshot, apiKey, options = {}) {
 				input_schema: GOBLIN_DECISION_SCHEMA.schema
 			}
 		],
-		tool_choice: {
-			type: 'tool',
-			name: ANTHROPIC_DECISION_TOOL
-		}
+		toolChoice: { type: 'tool', name: ANTHROPIC_DECISION_TOOL },
+		fetch: options.fetch,
+		options
 	})
-	recordModelRequest(options)
-	const response = await httpFetch('https://api.anthropic.com/v1/messages', {
-		method: 'POST',
-		headers: {
-			'x-api-key': apiKey,
-			'anthropic-version': '2023-06-01',
-			'Content-Type': 'application/json'
-		},
-		body: requestBody
-	})
-
-	if (!response.ok) {
-		const text = await response.text()
-		recordModelFailure(options)
-		if (response.status === 429 || response.status === 529) {
-			options[getBackoffKey('anthropic')] = Date.now() + (options.recoveryBackoffMs || Number(process.env.GOBLINWORLD_RECOVERY_BACKOFF_MS) || DEFAULT_RECOVERY_BACKOFF_MS)
-		}
-		throw new Error(`Anthropic decision request failed (${response.status}): ${text.slice(0, 400)}`)
-	}
-
-	const responseJson = await response.json()
-	recordModelUsage(options, responseJson.usage)
 	const rawDecision = extractAnthropicDecision(responseJson)
 	if (!rawDecision) throw new Error('Anthropic decision response did not include a tool decision.')
 	recordSuccessfulModelCall(snapshot, options)
+	const legalActions = resolveLegalActions(snapshot)
+	coerceAdvisoryAction(rawDecision, legalActions)
 	return {
-		...validateGoblinDecision(rawDecision, DEFAULT_GOBLIN_ACTIONS),
+		...validateGoblinDecision(rawDecision, legalActions),
 		controller: 'anthropic'
 	}
 }
 
 async function tickGoblin(world, options = {}) {
 	const snapshot = world.getSnapshot()
+	if (typeof world.getCoverageForCurrentMap === 'function') {
+		snapshot.navCoverage = world.getCoverageForCurrentMap()
+	}
 	if (shouldHoldForDialogue(snapshot, options)) {
 		return world.applyDecision(dialogueHoldDecision(snapshot, options))
 	}
 	try {
 		const decision = await requestGoblinDecision(snapshot, options)
+		if (typeof world.setExplorationGoal === 'function') world.setExplorationGoal(decision.goal || null)
 		return world.applyDecision(decision)
 	} catch (error) {
 		const provider = getModelProvider(options)
@@ -1062,7 +1083,7 @@ async function tickWorld(world, options = {}) {
 	}
 	const openingStoryEvents = typeof world.advanceStory === 'function' ? world.advanceStory(storyOptions) : []
 	const goblinEvent = await tickGoblin(world, options)
-	const npcEvents = typeof world.advanceNpcs === 'function' ? world.advanceNpcs(options) : []
+	const npcEvents = typeof world.advanceNpcs === 'function' ? await world.advanceNpcs(options) : []
 	const storyEvents = typeof world.advanceStory === 'function' ? world.advanceStory(storyOptions) : []
 	return [...openingStoryEvents, goblinEvent, ...npcEvents, ...storyEvents]
 }
@@ -1094,6 +1115,7 @@ module.exports = {
 	hasModelController,
 	hasOpenAIController: hasModelController,
 	requestGoblinDecision,
+	resolveGoalToDecision,
 	startGoblinLoop,
 	tickGoblin,
 	tickWorld

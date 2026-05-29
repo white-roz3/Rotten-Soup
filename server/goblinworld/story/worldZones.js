@@ -122,6 +122,29 @@ const STORY_ZONES = {
 	}
 }
 
+const ZONE_ANCHORS = {
+	tavern: { dialog: ['BARTENDER'], sprites: ['bartender'] },
+	'mayor-house': { dialog: ['MAYOR_LEONARD'], sprites: ['mayor'] },
+	market: { dialog: ['DWARF_BILI'], sprites: ['dwarf', 'marketTrader'] },
+	armory: { dialog: ['STONE_GUARD'], sprites: ['stoneGuard'] },
+	'town-square': { dialog: [], sprites: ['hoodedVillager'] },
+	'forest-edge': { dialog: [], sprites: ['forestWanderer'] },
+	'under-road': { dialog: [], sprites: ['lanternKeeper'] }
+}
+
+function findZoneAnchor(map, zoneId) {
+	const anchor = ZONE_ANCHORS[zoneId]
+	if (!anchor) return null
+	const actors = (map && map.actors) || []
+	return (
+		actors.find(actor => {
+			if (actor.dialog && anchor.dialog.includes(actor.dialog)) return true
+			if (actor.spriteKey && anchor.sprites.includes(actor.spriteKey)) return true
+			return false
+		}) || null
+	)
+}
+
 function normalizePosition(position, fallback = { x: 0, y: 0 }) {
 	return {
 		x: Number.isInteger(position && position.x) ? position.x : fallback.x,
@@ -139,6 +162,13 @@ function getMapSize(map = {}) {
 function getZoneCenter(map = {}, zoneId = 'mulberry') {
 	const zone = STORY_ZONES[zoneId] || STORY_ZONES.mulberry
 	const size = getMapSize(map)
+	const anchor = findZoneAnchor(map, zoneId)
+	if (anchor && Number.isInteger(anchor.x) && Number.isInteger(anchor.y)) {
+		return {
+			x: Math.max(0, Math.min(size.width - 1, anchor.x)),
+			y: Math.max(0, Math.min(size.height - 1, anchor.y))
+		}
+	}
 	return {
 		x: Math.max(0, Math.min(size.width - 1, Math.floor(size.width * zone.centerRatio.x))),
 		y: Math.max(0, Math.min(size.height - 1, Math.floor(size.height * zone.centerRatio.y)))
